@@ -38,6 +38,9 @@ export default function Welcome() {
       </div>
 
       <div className="welcome-links">
+        <Link to="/instructions">📖 Instructions</Link>
+      </div>
+      <div className="welcome-links" style={{ marginTop: 10 }}>
         <Link to="/leaderboard">Leaderboard</Link>
         <Link to="/setup">Players</Link>
       </div>

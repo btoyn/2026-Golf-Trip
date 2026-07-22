@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Welcome from './pages/Welcome'
+import Instructions from './pages/Instructions'
 import Setup from './pages/Setup'
 import RoundHome from './pages/RoundHome'
 import HoleEntry from './pages/HoleEntry'
@@ -13,6 +14,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Welcome />} />
         <Route path="/setup" element={<Setup />} />
+        <Route path="/instructions" element={<Instructions />} />
         <Route path="/round/:roundId" element={<RoundHome />} />
         <Route path="/round/:roundId/hole/:holeNum" element={<HoleEntry />} />
         <Route path="/round/:roundId/leaderboard" element={<LiveLeaderboard />} />
