@@ -22,8 +22,15 @@ function freshRounds(): Round[] {
   }))
 }
 
+/** The trip's four golfers. Teams rotate; names are fixed defaults here. */
+const DEFAULT_NAMES = ['Brandon', 'Chase', 'Vance', 'Nate']
+
+function defaultPlayers(): Player[] {
+  return DEFAULT_NAMES.map((name, i) => ({ id: `p${i}`, name, handicap: 0 }))
+}
+
 function emptyState(): TripState {
-  return { players: [], rounds: freshRounds(), version: CURRENT_VERSION }
+  return { players: defaultPlayers(), rounds: freshRounds(), version: CURRENT_VERSION }
 }
 
 function load(): TripState {
@@ -38,7 +45,7 @@ function load(): TripState {
         r.gross = Array.from({ length: 18 }, () => ({}))
       }
     })
-    if (!parsed.players) parsed.players = []
+    if (!parsed.players || parsed.players.length !== 4) parsed.players = defaultPlayers()
     return parsed
   } catch {
     return emptyState()

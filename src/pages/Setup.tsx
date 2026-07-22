@@ -11,6 +11,7 @@ interface Draft {
 }
 
 const LETTERS = ['A', 'B', 'C', 'D']
+const DEFAULT_NAMES = ['Brandon', 'Chase', 'Vance', 'Nate']
 
 export default function Setup() {
   const { state, setPlayers, resetAll } = useStore()
@@ -20,7 +21,7 @@ export default function Setup() {
     if (state.players.length === 4) {
       return state.players.map((p) => ({ name: p.name, handicap: String(p.handicap) }))
     }
-    return LETTERS.map(() => ({ name: '', handicap: '' }))
+    return DEFAULT_NAMES.map((name) => ({ name, handicap: '' }))
   })
 
   const update = (i: number, key: keyof Draft, value: string) => {
@@ -43,9 +44,9 @@ export default function Setup() {
   }
 
   const clearTrip = () => {
-    if (confirm('Reset the entire trip? This clears all players and scores.')) {
+    if (confirm('Reset the entire trip? This clears all scores and restores default golfers.')) {
       resetAll()
-      setDrafts(LETTERS.map(() => ({ name: '', handicap: '' })))
+      setDrafts(DEFAULT_NAMES.map((name) => ({ name, handicap: '' })))
     }
   }
 

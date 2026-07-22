@@ -49,8 +49,18 @@ no rounding.
 
 ## Screens
 
-Setup → Trip hub → Round home → Live hole entry → Live leaderboard →
-Round summary → Trip leaderboard.
+Welcome (logo + course picker) → Round home → Live hole entry →
+Live leaderboard → Round summary → Trip leaderboard. Players & handicaps are
+edited from the **Players** link on the welcome page.
+
+Golfers default to **Brandon, Chase, Vance, Nate** (edit anytime under
+Players). Teams rotate every round and any round's 2v2 split is configurable.
+
+## Logo
+
+The welcome page loads `public/logo.png`. Until that file exists it shows a
+themed fallback badge, so nothing breaks. To use the real logo, drop your image
+in as `public/logo.png` (the "Sweaty Balls Cup" art works great) and commit it.
 
 ## Course photos
 
