@@ -18,6 +18,8 @@ function freshRounds(): Round[] {
     index,
     pairing,
     gross: Array.from({ length: 18 }, () => ({})),
+    putts: Array.from({ length: 18 }, () => ({})),
+    longestPutt: Array.from({ length: 18 }, () => null),
     locked: false,
   }))
 }
@@ -39,10 +41,16 @@ function load(): TripState {
     if (!raw) return emptyState()
     const parsed = JSON.parse(raw) as TripState
     if (!parsed.rounds || parsed.rounds.length !== 4) parsed.rounds = freshRounds()
-    // Ensure each round has 18 hole objects.
+    // Ensure each round has 18-length arrays (backfill older saves).
     parsed.rounds.forEach((r) => {
       if (!Array.isArray(r.gross) || r.gross.length !== 18) {
         r.gross = Array.from({ length: 18 }, () => ({}))
+      }
+      if (!Array.isArray(r.putts) || r.putts.length !== 18) {
+        r.putts = Array.from({ length: 18 }, () => ({}))
+      }
+      if (!Array.isArray(r.longestPutt) || r.longestPutt.length !== 18) {
+        r.longestPutt = Array.from({ length: 18 }, () => null)
       }
     })
     if (!parsed.players || parsed.players.length !== 4) parsed.players = defaultPlayers()
@@ -56,6 +64,8 @@ interface Store {
   state: TripState
   setPlayers: (players: Player[]) => void
   setScore: (roundIndex: number, hole: number, playerId: string, gross: number | null) => void
+  setPutts: (roundIndex: number, hole: number, playerId: string, putts: number | null) => void
+  setLongestPutt: (roundIndex: number, hole: number, playerId: string | null) => void
   setPairing: (roundIndex: number, pairing: PairingSplit) => void
   setLocked: (roundIndex: number, locked: boolean) => void
   resetAll: () => void
@@ -98,6 +108,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const setPutts = useCallback(
+    (roundIndex: number, hole: number, playerId: string, putts: number | null) => {
+      setState((s) => {
+        const rounds = s.rounds.map((r) => {
+          if (r.index !== roundIndex) return r
+          const puttsArr = r.putts.map((h) => ({ ...h }))
+          if (putts === null || Number.isNaN(putts)) {
+            delete puttsArr[hole][playerId]
+          } else {
+            puttsArr[hole][playerId] = putts
+          }
+          return { ...r, putts: puttsArr }
+        })
+        return { ...s, rounds }
+      })
+    },
+    [],
+  )
+
+  const setLongestPutt = useCallback(
+    (roundIndex: number, hole: number, playerId: string | null) => {
+      setState((s) => {
+        const rounds = s.rounds.map((r) => {
+          if (r.index !== roundIndex) return r
+          const arr = [...r.longestPutt]
+          arr[hole] = playerId
+          return { ...r, longestPutt: arr }
+        })
+        return { ...s, rounds }
+      })
+    },
+    [],
+  )
+
   const setPairing = useCallback((roundIndex: number, pairing: PairingSplit) => {
     setState((s) => ({
       ...s,
@@ -119,12 +163,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       state,
       setPlayers,
       setScore,
+      setPutts,
+      setLongestPutt,
       setPairing,
       setLocked,
       resetAll,
       hasPlayers: state.players.length === 4,
     }),
-    [state, setPlayers, setScore, setPairing, setLocked, resetAll],
+    [state, setPlayers, setScore, setPutts, setLongestPutt, setPairing, setLocked, resetAll],
   )
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

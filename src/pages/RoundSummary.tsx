@@ -2,7 +2,7 @@ import { useNavigate, useParams, Navigate } from 'react-router-dom'
 import TopBar from '../components/TopBar'
 import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
-import { computeSkins, playerRoundLines, teamMatch } from '../lib/scoring'
+import { computeAllSkins, playerRoundLines, teamMatch } from '../lib/scoring'
 
 function money(n: number) {
   const r = Math.round(n * 100) / 100
@@ -33,11 +33,12 @@ export default function RoundSummary() {
 
   const lines = playerRoundLines(players, round, course)
   const match = teamMatch(players, round, course)
-  const skins = computeSkins(players, round, course)
+  const skins = computeAllSkins(players, round, course)
   const name = (id: string) => players.find((p) => p.id === id)?.name ?? '?'
 
-  const totalWon = players.reduce((sum, p) => sum + (skins.winnings[p.id] ?? 0), 0)
+  const totalWon = players.reduce((sum, p) => sum + (skins.total[p.id] ?? 0), 0)
   const share = totalWon / players.length // equal ante against distributed pots
+  const carrying = skins.points.potCarrying + skins.putts.potCarrying
 
   const holesPlayed = round.gross.filter((hh) => Object.keys(hh).length > 0).length
 
@@ -103,23 +104,29 @@ export default function RoundSummary() {
           </table>
         </div>
 
-        <h2 className="section">Skins Tally</h2>
+        <h2 className="section">Skins Tally — $0.25/Hole Each</h2>
         <div className="card" style={{ padding: 0 }}>
           <table>
             <thead>
               <tr>
                 <th className="left">Player</th>
+                <th>Pts</th>
+                <th>Putts</th>
+                <th>Long</th>
                 <th>Won</th>
                 <th>Net</th>
               </tr>
             </thead>
             <tbody>
               {players.map((p) => {
-                const won = skins.winnings[p.id] ?? 0
+                const won = skins.total[p.id] ?? 0
                 const net = won - share
                 return (
                   <tr key={p.id}>
                     <td className="left">{p.name}</td>
+                    <td className="money">{money(skins.points.winnings[p.id])}</td>
+                    <td className="money">{money(skins.putts.winnings[p.id])}</td>
+                    <td className="money">{money(skins.longest.winnings[p.id])}</td>
                     <td className="money">{money(won)}</td>
                     <td className={`money ${net > 0 ? 'pos' : net < 0 ? 'neg' : ''}`}>
                       {signedMoney(net)}
@@ -131,8 +138,9 @@ export default function RoundSummary() {
           </table>
         </div>
         <p className="muted" style={{ marginTop: 6 }}>
-          Net = winnings minus an equal share of the {money(totalWon)} awarded (settle-up).
-          {skins.potCarrying > 0 && ` ${money(skins.potCarrying)} still carrying (unclaimed).`}
+          Three skins games (points, fewest putts, longest putt), each $0.25/hole. Net = winnings
+          minus an equal share of the {money(totalWon)} awarded (settle-up).
+          {carrying > 0 && ` ${money(carrying)} still carrying (unclaimed).`}
         </p>
 
         <div className="spacer" />
@@ -163,7 +171,7 @@ export default function RoundSummary() {
             Trip Leaderboard
           </button>
           <button className="btn secondary small" onClick={() => navigate('/')}>
-            Trip Hub
+            Home
           </button>
         </div>
       </div>

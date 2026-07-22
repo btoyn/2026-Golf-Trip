@@ -43,7 +43,7 @@ export default function Welcome() {
       </div>
 
       <p className="welcome-foot">
-        Quota game · quota-point skins ($1/hole) · teams rotate each round.
+        Quota game · 3 skins ($0.25/hole: points, fewest putts, longest putt) · teams rotate.
         <br />
         Saved on this device — works offline on the course.
       </p>

@@ -1,7 +1,10 @@
 /* Lightweight assertions runnable with `npm test` (tsx). */
 import type { Course, Player, Round } from '../types'
 import {
-  computeSkins,
+  computeAllSkins,
+  computeLongestPuttSkins,
+  computePointsSkins,
+  computePuttsSkins,
   holePoints,
   quota,
   quotaPoints,
@@ -58,27 +61,69 @@ const course: Course = {
 }
 
 function emptyRound(): Round {
-  return { index: 0, pairing: 0, gross: Array.from({ length: 18 }, () => ({})), locked: false }
+  return {
+    index: 0,
+    pairing: 0,
+    gross: Array.from({ length: 18 }, () => ({})),
+    putts: Array.from({ length: 18 }, () => ({})),
+    longestPutt: Array.from({ length: 18 }, () => null),
+    locked: false,
+  }
 }
 
-// Skins: hole 1 outright winner (A birdies), everyone else par.
+// Points skin: hole 1 outright winner (A birdies), everyone else par. $0.25.
 const r = emptyRound()
 r.gross[0] = { a: 3, b: 4, c: 4, d: 4 }
-let skins = computeSkins(players, r, course)
-eq(skins.holes[0].winnerId, 'a', 'skins h1 outright winner A')
-eq(skins.holes[0].pot, 1, 'skins h1 pot = $1')
-eq(skins.winnings['a'], 1, 'A wins $1')
+let skins = computePointsSkins(players, r, course)
+eq(skins.holes[0].winnerId, 'a', 'points skin h1 outright winner A')
+eq(skins.holes[0].pot, 0.25, 'points skin h1 pot = $0.25')
+eq(skins.winnings['a'], 0.25, 'A wins $0.25')
 
-// Skins push then carry: h1 tie (A & B birdie) -> push; h2 A birdies alone -> wins $2
+// Push then carry: h1 tie (A & B birdie) -> push; h2 A birdies alone -> wins $0.50
 const r2 = emptyRound()
 r2.gross[0] = { a: 3, b: 3, c: 4, d: 4 }
 r2.gross[1] = { a: 3, b: 4, c: 4, d: 4 }
-skins = computeSkins(players, r2, course)
+skins = computePointsSkins(players, r2, course)
 eq(skins.holes[0].push, true, 'h1 push')
-eq(skins.holes[0].pot, 1, 'h1 pot $1 carries')
+eq(skins.holes[0].pot, 0.25, 'h1 pot $0.25 carries')
 eq(skins.holes[1].winnerId, 'a', 'h2 A wins')
-eq(skins.holes[1].pot, 2, 'h2 pot = $2 (carry + 1)')
-eq(skins.winnings['a'], 2, 'A total $2')
+eq(skins.holes[1].pot, 0.5, 'h2 pot = $0.50 (carry + 0.25)')
+eq(skins.winnings['a'], 0.5, 'A total $0.50')
+
+// Fewest-putts skin (lowest wins). h1 B alone lowest (1 putt) -> B wins $0.25.
+const rp = emptyRound()
+rp.putts[0] = { a: 2, b: 1, c: 2, d: 3 }
+// h2 tie for fewest (A & B both 1) -> push, carries; h3 A alone 1 -> wins $0.75
+rp.putts[1] = { a: 1, b: 1, c: 2, d: 2 }
+rp.putts[2] = { a: 1, b: 2, c: 2, d: 2 }
+const puttSkins = computePuttsSkins(players, rp)
+eq(puttSkins.holes[0].winnerId, 'b', 'putts h1 B fewest')
+eq(puttSkins.holes[0].pot, 0.25, 'putts h1 pot $0.25')
+eq(puttSkins.holes[1].push, true, 'putts h2 tie push')
+eq(puttSkins.holes[2].winnerId, 'a', 'putts h3 A wins carry')
+eq(puttSkins.holes[2].pot, 0.5, 'putts h3 pot $0.50 (h2 carry $0.25 + h3 $0.25)')
+eq(puttSkins.winnings['a'], 0.5, 'A putts total $0.50')
+eq(puttSkins.winnings['b'], 0.25, 'B putts total $0.25')
+
+// Longest-putt skin: manual pick, no carry, $0.25 each marked hole.
+const rl = emptyRound()
+rl.longestPutt[0] = 'c'
+rl.longestPutt[5] = 'c'
+const longSkins = computeLongestPuttSkins(players, rl)
+eq(longSkins.winnings['c'], 0.5, 'C longest-putt total $0.50 (2 holes)')
+eq(longSkins.holes[0].winnerId, 'c', 'long h1 winner C')
+eq(longSkins.holes[1].complete, false, 'long h2 unmarked -> not complete')
+
+// Combined total across the three games for a single hole.
+const rc = emptyRound()
+rc.gross[0] = { a: 3, b: 4, c: 4, d: 4 } // points skin -> A
+rc.putts[0] = { a: 2, b: 1, c: 2, d: 2 } // putts skin -> B
+rc.longestPutt[0] = 'c' // long putt -> C
+const all = computeAllSkins(players, rc, course)
+eq(all.total['a'], 0.25, 'combined A $0.25 (points)')
+eq(all.total['b'], 0.25, 'combined B $0.25 (putts)')
+eq(all.total['c'], 0.25, 'combined C $0.25 (long putt)')
+eq(all.total['d'], 0, 'combined D $0')
 
 // Team match: split 0 => A+B vs C+D. A&B each net birdie (pts 3), C&D net par (pts 2) on hole1.
 const r3 = emptyRound()

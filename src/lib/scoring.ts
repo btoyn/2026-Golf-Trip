@@ -48,29 +48,39 @@ export function holePoints(
   return quotaPoints(netScore(gross, handicap, strokeIndex), par)
 }
 
+/** Every skin (all three games) is worth 25 cents per hole. */
+export const SKIN_UNIT = 0.25
+
 export interface SkinHoleResult {
-  /** Player id of the outright winner, or null on a push. */
+  /** Player id of the outright winner, or null on a push / not-yet-decided. */
   winnerId: string | null
   /** Dollars in the pot for this hole (what the winner takes, or what carries). */
   pot: number
   /** True when the hole is a push (tie for the lead). */
   push: boolean
-  /** True when all 4 gross scores were present so the result is final. */
+  /** True when the hole result is final (all needed inputs present). */
   complete: boolean
 }
 
+export interface SkinGameResult {
+  holes: SkinHoleResult[]
+  winnings: Record<string, number>
+  /** Unclaimed money carried past the last completed hole. */
+  potCarrying: number
+}
+
 /**
- * Compute quota-point skins across a round.
- * Each hole adds $1 to the pot. Outright highest quota points wins the pot
- * (pot then resets). A tie for the lead pushes and the pot carries forward.
- *
- * Returns per-hole results plus running winnings per player id.
+ * Generic carry-style skin: each hole adds one unit to the pot; an outright
+ * best score wins the pot (which then resets); a tie for the best pushes and
+ * the pot carries forward. `values[h]` is a map of playerId -> comparable
+ * number for that hole, or null when the hole isn't fully entered yet.
  */
-export function computeSkins(
+function carrySkins(
   players: Player[],
-  round: Round,
-  course: Course,
-): { holes: SkinHoleResult[]; winnings: Record<string, number>; potCarrying: number } {
+  values: (Record<string, number> | null)[],
+  mode: 'high' | 'low',
+  unit = SKIN_UNIT,
+): SkinGameResult {
   const winnings: Record<string, number> = {}
   players.forEach((p) => (winnings[p.id] = 0))
 
@@ -78,29 +88,20 @@ export function computeSkins(
   let carry = 0
 
   for (let h = 0; h < 18; h++) {
-    const pot = carry + 1
-    const entries = round.gross[h] ?? {}
-    const allEntered = players.every((p) => typeof entries[p.id] === 'number')
-
-    if (!allEntered) {
-      // Not final yet: reflect the pot that WOULD be at stake but don't award.
-      // The pot is shown as at-stake but not awarded. Carry is left unchanged
-      // so the displayed pot stays consistent once the scores fill in.
+    const pot = carry + unit
+    const v = values[h]
+    if (!v) {
       holes.push({ winnerId: null, pot, push: false, complete: false })
       continue
     }
-
-    const pts = players.map((p) => ({
-      id: p.id,
-      pts: holePoints(entries[p.id], p.handicap, course.par[h], course.si[h]),
-    }))
-    const max = Math.max(...pts.map((x) => x.pts))
-    const leaders = pts.filter((x) => x.pts === max)
+    const arr = players.map((p) => ({ id: p.id, val: v[p.id] }))
+    const nums = arr.map((a) => a.val)
+    const target = mode === 'high' ? Math.max(...nums) : Math.min(...nums)
+    const leaders = arr.filter((a) => a.val === target)
 
     if (leaders.length === 1) {
-      const winnerId = leaders[0].id
-      winnings[winnerId] += pot
-      holes.push({ winnerId, pot, push: false, complete: true })
+      winnings[leaders[0].id] += pot
+      holes.push({ winnerId: leaders[0].id, pot, push: false, complete: true })
       carry = 0
     } else {
       holes.push({ winnerId: null, pot, push: true, complete: true })
@@ -108,8 +109,73 @@ export function computeSkins(
     }
   }
 
-  // `carry` now reflects unclaimed money carried past the last completed hole.
   return { holes, winnings, potCarrying: carry }
+}
+
+/** Skin game 1: outright highest quota points on the hole (net-based). */
+export function computePointsSkins(
+  players: Player[],
+  round: Round,
+  course: Course,
+): SkinGameResult {
+  const values = round.gross.map((entries, h) => {
+    if (!players.every((p) => typeof entries[p.id] === 'number')) return null
+    const m: Record<string, number> = {}
+    players.forEach((p) => {
+      m[p.id] = holePoints(entries[p.id], p.handicap, course.par[h], course.si[h])
+    })
+    return m
+  })
+  return carrySkins(players, values, 'high')
+}
+
+/** Skin game 2: fewest putts on the hole. Ties push and carry. */
+export function computePuttsSkins(players: Player[], round: Round): SkinGameResult {
+  const values = round.putts.map((entries) => {
+    if (!players.every((p) => typeof entries[p.id] === 'number')) return null
+    const m: Record<string, number> = {}
+    players.forEach((p) => (m[p.id] = entries[p.id]))
+    return m
+  })
+  return carrySkins(players, values, 'low')
+}
+
+/**
+ * Skin game 3: longest putt. This is a manual per-hole pick (no carry) — the
+ * marked player takes one unit for that hole.
+ */
+export function computeLongestPuttSkins(players: Player[], round: Round, unit = SKIN_UNIT): SkinGameResult {
+  const winnings: Record<string, number> = {}
+  players.forEach((p) => (winnings[p.id] = 0))
+  const holes: SkinHoleResult[] = round.longestPutt.map((winnerId) => {
+    if (winnerId && winnings[winnerId] !== undefined) {
+      winnings[winnerId] += unit
+      return { winnerId, pot: unit, push: false, complete: true }
+    }
+    return { winnerId: null, pot: unit, push: false, complete: false }
+  })
+  return { holes, winnings, potCarrying: 0 }
+}
+
+export interface AllSkins {
+  points: SkinGameResult
+  putts: SkinGameResult
+  longest: SkinGameResult
+  /** Combined winnings across all three games, per player id. */
+  total: Record<string, number>
+}
+
+/** Compute all three skin games plus a combined per-player total. */
+export function computeAllSkins(players: Player[], round: Round, course: Course): AllSkins {
+  const points = computePointsSkins(players, round, course)
+  const putts = computePuttsSkins(players, round)
+  const longest = computeLongestPuttSkins(players, round)
+  const total: Record<string, number> = {}
+  players.forEach((p) => {
+    total[p.id] =
+      points.winnings[p.id] + putts.winnings[p.id] + longest.winnings[p.id]
+  })
+  return { points, putts, longest, total }
 }
 
 export interface PlayerRoundLine {

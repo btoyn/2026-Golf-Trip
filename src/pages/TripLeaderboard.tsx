@@ -2,7 +2,7 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import TopBar from '../components/TopBar'
 import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
-import { computeSkins, playerRoundLines, teamMatch } from '../lib/scoring'
+import { computeAllSkins, playerRoundLines, teamMatch } from '../lib/scoring'
 
 function money(n: number) {
   const r = Math.round(n * 100) / 100
@@ -45,9 +45,9 @@ export default function TripLeaderboard() {
     const lines = playerRoundLines(players, round, course)
     lines.forEach((l) => (agg[l.playerId].margin += l.margin))
 
-    const skins = computeSkins(players, round, course)
-    players.forEach((p) => (agg[p.id].skins += skins.winnings[p.id] ?? 0))
-    totalSkinsPot += players.reduce((s, p) => s + (skins.winnings[p.id] ?? 0), 0)
+    const skins = computeAllSkins(players, round, course)
+    players.forEach((p) => (agg[p.id].skins += skins.total[p.id] ?? 0))
+    totalSkinsPot += players.reduce((s, p) => s + (skins.total[p.id] ?? 0), 0)
 
     // Only score the match record for rounds that have been played at all.
     const played = round.gross.some((h) => Object.keys(h).length > 0)

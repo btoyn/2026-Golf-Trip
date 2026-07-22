@@ -3,18 +3,23 @@ import TopBar from '../components/TopBar'
 import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
 import {
-  computeSkins,
+  computeAllSkins,
   holePoints,
   netScore,
   strokesReceived,
+  type SkinHoleResult,
 } from '../lib/scoring'
+
+function money(n: number): string {
+  return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`
+}
 
 export default function HoleEntry() {
   const { roundId, holeNum } = useParams()
   const idx = Number(roundId)
   const hole = Number(holeNum) // 1-based
   const navigate = useNavigate()
-  const { state, setScore } = useStore()
+  const { state, setScore, setPutts, setLongestPutt } = useStore()
   const { players, rounds } = state
 
   const round = rounds.find((r) => r.index === idx)
@@ -24,31 +29,39 @@ export default function HoleEntry() {
   const h = hole - 1
   const par = course.par[h]
   const si = course.si[h]
-  const entries = round.gross[h] ?? {}
+  const grossEntries = round.gross[h] ?? {}
+  const puttEntries = round.putts[h] ?? {}
+  const longId = round.longestPutt[h] ?? null
   const locked = round.locked
 
-  const skins = computeSkins(players, round, course)
-  const skin = skins.holes[h]
+  const skins = computeAllSkins(players, round, course)
+  const name = (id: string | null) => (id ? players.find((p) => p.id === id)?.name ?? '?' : '?')
 
-  const change = (playerId: string, delta: number) => {
-    const current = entries[playerId]
-    const base = typeof current === 'number' ? current : par
-    const next = Math.max(1, base + delta)
-    setScore(idx, h, playerId, next)
+  const changeGross = (playerId: string, delta: number) => {
+    const cur = grossEntries[playerId]
+    const base = typeof cur === 'number' ? cur : par
+    setScore(idx, h, playerId, Math.max(1, base + delta))
   }
-
-  const setExact = (playerId: string, raw: string) => {
-    if (raw === '') {
-      setScore(idx, h, playerId, null)
-      return
-    }
+  const setGrossExact = (playerId: string, raw: string) => {
+    if (raw === '') return setScore(idx, h, playerId, null)
     const n = Math.max(1, Math.round(Number(raw)))
     if (!Number.isNaN(n)) setScore(idx, h, playerId, n)
   }
 
-  const winnerName = skin.winnerId
-    ? players.find((p) => p.id === skin.winnerId)?.name
-    : null
+  const changePutts = (playerId: string, delta: number) => {
+    const cur = puttEntries[playerId]
+    const base = typeof cur === 'number' ? cur : 0
+    setPutts(idx, h, playerId, Math.max(0, base + delta))
+  }
+  const setPuttsExact = (playerId: string, raw: string) => {
+    if (raw === '') return setPutts(idx, h, playerId, null)
+    const n = Math.max(0, Math.round(Number(raw)))
+    if (!Number.isNaN(n)) setPutts(idx, h, playerId, n)
+  }
+
+  const toggleLong = (playerId: string) => {
+    setLongestPutt(idx, h, longId === playerId ? null : playerId)
+  }
 
   return (
     <>
@@ -84,63 +97,84 @@ export default function HoleEntry() {
         )}
 
         {players.map((p) => {
-          const g = entries[p.id]
-          const has = typeof g === 'number'
+          const g = grossEntries[p.id]
+          const hasG = typeof g === 'number'
           const sr = strokesReceived(p.handicap, si)
-          const net = has ? netScore(g, p.handicap, si) : null
-          const pts = has ? holePoints(g, p.handicap, par, si) : null
+          const net = hasG ? netScore(g, p.handicap, si) : null
+          const pts = hasG ? holePoints(g, p.handicap, par, si) : null
+          const pu = puttEntries[p.id]
+          const hasP = typeof pu === 'number'
+          const isLong = longId === p.id
           return (
-            <div className="score-row" key={p.id}>
-              <div className="who">
-                <div className="name">{p.name}</div>
-                <div className="sub">
-                  {sr > 0 ? `${sr} stroke${sr > 1 ? 's' : ''}` : 'no stroke'}
-                  {net !== null && <> &middot; net {net}</>}
+            <div className="player-card" key={p.id}>
+              <div className="pc-main">
+                <div className="who">
+                  <div className="name">{p.name}</div>
+                  <div className="sub">
+                    {sr > 0 ? `${sr} stk` : 'no stk'}
+                    {net !== null && <> &middot; net {net}</>}
+                  </div>
+                </div>
+                <div className="stepper">
+                  <button disabled={locked} onClick={() => changeGross(p.id, -1)} aria-label="score minus">
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={hasG ? g : ''}
+                    placeholder={String(par)}
+                    disabled={locked}
+                    onChange={(e) => setGrossExact(p.id, e.target.value)}
+                  />
+                  <button disabled={locked} onClick={() => changeGross(p.id, 1)} aria-label="score plus">
+                    +
+                  </button>
+                </div>
+                <div className="pts-badge">
+                  <div className="p">{pts !== null ? pts : '–'}</div>
+                  <div className="l">pts</div>
                 </div>
               </div>
-              <div className="stepper">
-                <button disabled={locked} onClick={() => change(p.id, -1)} aria-label="minus">
-                  −
-                </button>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={has ? g : ''}
-                  placeholder={String(par)}
+
+              <div className="pc-extra">
+                <div className="putts-field">
+                  <span className="mini-label">Putts</span>
+                  <div className="stepper mini">
+                    <button disabled={locked} onClick={() => changePutts(p.id, -1)} aria-label="putts minus">
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={hasP ? pu : ''}
+                      placeholder="–"
+                      disabled={locked}
+                      onChange={(e) => setPuttsExact(p.id, e.target.value)}
+                    />
+                    <button disabled={locked} onClick={() => changePutts(p.id, 1)} aria-label="putts plus">
+                      +
+                    </button>
+                  </div>
+                </div>
+                <button
+                  className={`long-toggle ${isLong ? 'active' : ''}`}
                   disabled={locked}
-                  onChange={(e) => setExact(p.id, e.target.value)}
-                />
-                <button disabled={locked} onClick={() => change(p.id, 1)} aria-label="plus">
-                  +
+                  onClick={() => toggleLong(p.id)}
+                >
+                  🚩 Long putt
                 </button>
-              </div>
-              <div className="pts-badge">
-                <div className="p">{pts !== null ? pts : '–'}</div>
-                <div className="l">pts</div>
               </div>
             </div>
           )
         })}
 
-        {/* Skins result for this hole */}
-        {skin.complete ? (
-          skin.push ? (
-            <div className="skin-banner push">
-              Push — no winner
-              <span className="small">${skin.pot} pot carries to next hole</span>
-            </div>
-          ) : (
-            <div className="skin-banner win">
-              Skin: {winnerName} wins ${skin.pot}
-              <span className="small">Highest quota points on the hole</span>
-            </div>
-          )
-        ) : (
-          <div className="skin-banner push">
-            Skins: enter all 4 scores
-            <span className="small">${skin.pot} at stake this hole</span>
-          </div>
-        )}
+        {/* Three skin games for this hole */}
+        <div className="hole-skins">
+          <SkinLine label="Points" res={skins.points.holes[h]} winner={name} incomplete="enter 4 scores" />
+          <SkinLine label="Fewest putts" res={skins.putts.holes[h]} winner={name} incomplete="enter 4 putts" />
+          <LongPuttLine longId={longId} name={name} />
+        </div>
 
         <div className="btn-row">
           <button
@@ -171,5 +205,53 @@ export default function HoleEntry() {
         </div>
       </div>
     </>
+  )
+}
+
+function SkinLine({
+  label,
+  res,
+  winner,
+  incomplete,
+}: {
+  label: string
+  res: SkinHoleResult
+  winner: (id: string | null) => string
+  incomplete: string
+}) {
+  let cls = 'skin-line'
+  let text: string
+  if (!res.complete) {
+    cls += ' pending'
+    text = `${incomplete} · ${money(res.pot)} at stake`
+  } else if (res.push) {
+    cls += ' push'
+    text = `push · ${money(res.pot)} carries`
+  } else {
+    cls += ' win'
+    text = `${winner(res.winnerId)} · ${money(res.pot)}`
+  }
+  return (
+    <div className={cls}>
+      <span className="sl-label">{label}</span>
+      <span className="sl-result">{text}</span>
+    </div>
+  )
+}
+
+function LongPuttLine({
+  longId,
+  name,
+}: {
+  longId: string | null
+  name: (id: string | null) => string
+}) {
+  const cls = 'skin-line ' + (longId ? 'win' : 'pending')
+  const text = longId ? `${name(longId)} · ${money(0.25)}` : 'tap a player above · $0.25'
+  return (
+    <div className={cls}>
+      <span className="sl-label">Long putt</span>
+      <span className="sl-result">{text}</span>
+    </div>
   )
 }

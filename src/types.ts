@@ -31,6 +31,10 @@ export interface Round {
    * hole is 0..17.
    */
   gross: Record<string, number>[]
+  /** putts[hole][playerId] = putts on that hole (for the fewest-putts skin). */
+  putts: Record<string, number>[]
+  /** longestPutt[hole] = playerId who made the longest putt, or null. */
+  longestPutt: (string | null)[]
   locked: boolean
 }
 

@@ -2,11 +2,15 @@ import { useNavigate, useParams, Navigate } from 'react-router-dom'
 import TopBar from '../components/TopBar'
 import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
-import { computeSkins, playerRoundLines, teamMatch } from '../lib/scoring'
+import { computeAllSkins, playerRoundLines, teamMatch } from '../lib/scoring'
 
 function margin(n: number) {
   const cls = n > 0 ? 'pos' : n < 0 ? 'neg' : ''
   return <span className={cls}>{n > 0 ? `+${n}` : n}</span>
+}
+
+function money(n: number) {
+  return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`
 }
 
 export default function LiveLeaderboard() {
@@ -22,7 +26,7 @@ export default function LiveLeaderboard() {
 
   const lines = playerRoundLines(players, round, course)
   const match = teamMatch(players, round, course)
-  const skins = computeSkins(players, round, course)
+  const skins = computeAllSkins(players, round, course)
   const name = (id: string) => players.find((p) => p.id === id)?.name ?? '?'
 
   const indiv = [...lines].sort((a, b) => b.margin - a.margin)
@@ -86,11 +90,19 @@ export default function LiveLeaderboard() {
           </table>
         </div>
 
-        <h2 className="section">Skins — $1/Hole</h2>
-        <div className="card center">
-          <div className="muted">Pot carrying to next hole</div>
-          <div style={{ fontSize: 34, fontWeight: 800, color: 'var(--olive-dark)' }}>
-            ${skins.potCarrying}
+        <h2 className="section">Skins — $0.25/Hole Each</h2>
+        <div className="grid2" style={{ marginBottom: 12 }}>
+          <div className="card center" style={{ marginBottom: 0 }}>
+            <div className="muted">Points pot carrying</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--orange-dark)' }}>
+              {money(skins.points.potCarrying)}
+            </div>
+          </div>
+          <div className="card center" style={{ marginBottom: 0 }}>
+            <div className="muted">Putts pot carrying</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--orange-dark)' }}>
+              {money(skins.putts.potCarrying)}
+            </div>
           </div>
         </div>
         <div className="card" style={{ padding: 0 }}>
@@ -98,16 +110,24 @@ export default function LiveLeaderboard() {
             <thead>
               <tr>
                 <th className="left">Player</th>
-                <th>Skins Won</th>
+                <th>Points</th>
+                <th>Putts</th>
+                <th>Long</th>
+                <th>Total</th>
               </tr>
             </thead>
             <tbody>
-              {players.map((p) => (
-                <tr key={p.id}>
-                  <td className="left">{p.name}</td>
-                  <td className="money">${skins.winnings[p.id] ?? 0}</td>
-                </tr>
-              ))}
+              {[...players]
+                .sort((a, b) => skins.total[b.id] - skins.total[a.id])
+                .map((p) => (
+                  <tr key={p.id}>
+                    <td className="left">{p.name}</td>
+                    <td className="money">{money(skins.points.winnings[p.id])}</td>
+                    <td className="money">{money(skins.putts.winnings[p.id])}</td>
+                    <td className="money">{money(skins.longest.winnings[p.id])}</td>
+                    <td className="money pos">{money(skins.total[p.id])}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
