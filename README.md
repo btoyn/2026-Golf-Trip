@@ -73,3 +73,20 @@ colored panel. Add more by editing `COURSE_PHOTOS` in `src/data/courses.ts`.
 `vercel.json` rewrites all routes to `index.html` so client-side routing works
 on a static host. Point any static host / Vercel at the repo and build with
 `npm run build` (output in `dist/`).
+
+## Install on a phone (PWA)
+
+The app is a Progressive Web App: once deployed over HTTPS it can be installed
+to the home screen and runs offline (a service worker precaches the app shell).
+
+1. Deploy the repo to Vercel (auto-detects Vite; no config needed). You get a
+   URL like `https://2026-golf-trip.vercel.app`.
+2. Open that URL on each player's phone:
+   - **iPhone (Safari):** Share → *Add to Home Screen*.
+   - **Android (Chrome):** ⋮ menu → *Install app* / *Add to Home Screen*.
+3. Launch it from the new icon. After the first load it works with no signal.
+
+**Data is per-device.** There's no backend, so scores live in each phone's
+`localStorage` and don't sync between phones. The usual setup is one scorekeeper
+entering all four players' scores; everyone else can install it to view the
+rules/standings on their own copy.
