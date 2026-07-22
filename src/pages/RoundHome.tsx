@@ -11,7 +11,7 @@ export default function RoundHome() {
   const { roundId } = useParams()
   const idx = Number(roundId)
   const navigate = useNavigate()
-  const { state, setPairing } = useStore()
+  const { state, setPairing, resetRound } = useStore()
   const { players, rounds } = state
 
   const round = rounds.find((r) => r.index === idx)
@@ -88,6 +88,29 @@ export default function RoundHome() {
             Round Summary
           </Link>
         </div>
+
+        {entered > 0 && (
+          <>
+            <h2 className="section">Danger Zone</h2>
+            <button
+              className="btn danger"
+              onClick={() => {
+                if (
+                  confirm(
+                    `Reset ${course.day} (${course.name})? This erases all scores, putts, and longest-putt picks for this round. This can't be undone.`,
+                  )
+                ) {
+                  resetRound(idx)
+                }
+              }}
+            >
+              Reset This Round
+            </button>
+            <p className="muted center" style={{ marginTop: 8 }}>
+              Clears only this round. Other rounds and player handicaps are untouched.
+            </p>
+          </>
+        )}
       </div>
     </>
   )

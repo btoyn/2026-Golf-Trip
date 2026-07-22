@@ -68,6 +68,7 @@ interface Store {
   setLongestPutt: (roundIndex: number, hole: number, playerId: string | null) => void
   setPairing: (roundIndex: number, pairing: PairingSplit) => void
   setLocked: (roundIndex: number, locked: boolean) => void
+  resetRound: (roundIndex: number) => void
   resetAll: () => void
   hasPlayers: boolean
 }
@@ -156,6 +157,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const resetRound = useCallback((roundIndex: number) => {
+    setState((s) => ({
+      ...s,
+      rounds: s.rounds.map((r) =>
+        r.index === roundIndex
+          ? {
+              ...r,
+              gross: Array.from({ length: 18 }, () => ({})),
+              putts: Array.from({ length: 18 }, () => ({})),
+              longestPutt: Array.from({ length: 18 }, () => null),
+              locked: false,
+            }
+          : r,
+      ),
+    }))
+  }, [])
+
   const resetAll = useCallback(() => setState(emptyState()), [])
 
   const value = useMemo<Store>(
@@ -167,10 +185,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setLongestPutt,
       setPairing,
       setLocked,
+      resetRound,
       resetAll,
       hasPlayers: state.players.length === 4,
     }),
-    [state, setPlayers, setScore, setPutts, setLongestPutt, setPairing, setLocked, resetAll],
+    [
+      state,
+      setPlayers,
+      setScore,
+      setPutts,
+      setLongestPutt,
+      setPairing,
+      setLocked,
+      resetRound,
+      resetAll,
+    ],
   )
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
