@@ -73,6 +73,29 @@ export default function Instructions() {
           </p>
         </div>
 
+        <h2 className="section">📲 Live Scoreboard</h2>
+        <div className="card">
+          <p style={{ marginTop: 0 }}>
+            Everyone watches the same scores update live on their own phone.
+          </p>
+          <p>
+            <b>One person</b> is the scorekeeper and enters all the scores. Everyone else taps{' '}
+            <b>Follow Along</b> to watch (view-only).
+          </p>
+          <p>
+            Everyone uses the <b>same trip code</b> on the Live Scoreboard screen — set it once at
+            the start.
+          </p>
+          <p>
+            Updates need a cell signal; in a dead zone followers see the last update and catch up
+            when signal returns.
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            <b>Switching scorekeepers:</b> the current one taps Follow Along, then the new one taps
+            I'm the Scorekeeper — only one scorekeeper at a time.
+          </p>
+        </div>
+
         <div className="spacer" />
         <Link className="btn" to="/">
           Got It
