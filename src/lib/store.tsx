@@ -9,9 +9,39 @@ import {
 } from 'react'
 import type { PairingSplit, Player, Round, TripState } from '../types'
 import { DEFAULT_PAIRINGS } from '../data/courses'
+import { supabase } from './supabaseClient'
+import { GAMES_TABLE, SYNC_CONFIGURED } from './syncConfig'
 
 const STORAGE_KEY = 'golf-trip-2026'
+const SYNC_KEY = 'golf-sync-2026'
 const CURRENT_VERSION = 1
+
+/** off = local only, host = this device publishes scores, guest = follow along. */
+export type SyncRole = 'off' | 'host' | 'guest'
+export type SyncStatus = 'off' | 'connecting' | 'live' | 'offline'
+
+interface SyncSettings {
+  code: string
+  role: SyncRole
+}
+
+function loadSync(): SyncSettings {
+  try {
+    const raw = localStorage.getItem(SYNC_KEY)
+    if (raw) {
+      const p = JSON.parse(raw) as SyncSettings
+      return { code: p.code ?? '', role: p.role ?? 'off' }
+    }
+  } catch {
+    // ignore
+  }
+  return { code: '', role: 'off' }
+}
+
+/** Normalize a trip code so small typos ("Sweaty Balls" vs "sweaty-balls") still match. */
+export function normalizeCode(code: string): string {
+  return code.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+}
 
 function freshRounds(): Round[] {
   return DEFAULT_PAIRINGS.map((pairing, index) => ({
@@ -71,12 +101,27 @@ interface Store {
   resetRound: (roundIndex: number) => void
   resetAll: () => void
   hasPlayers: boolean
+  // ---- live sync ----
+  syncConfigured: boolean
+  syncCode: string
+  syncRole: SyncRole
+  syncStatus: SyncStatus
+  setSync: (code: string, role: SyncRole) => void
+  /** Guests (followers) view a read-only mirror of the scorekeeper's card. */
+  readOnly: boolean
 }
 
 const StoreContext = createContext<Store | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TripState>(load)
+  const initialSync = loadSync()
+  const [syncCode, setSyncCode] = useState<string>(initialSync.code)
+  const [syncRole, setSyncRole] = useState<SyncRole>(initialSync.role)
+  const [online, setOnline] = useState<boolean>(
+    typeof navigator === 'undefined' ? true : navigator.onLine,
+  )
+  const [subscribed, setSubscribed] = useState(false)
 
   useEffect(() => {
     try {
@@ -85,6 +130,93 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // storage full or unavailable; ignore — app still works in-memory.
     }
   }, [state])
+
+  // Persist sync settings.
+  useEffect(() => {
+    try {
+      localStorage.setItem(SYNC_KEY, JSON.stringify({ code: syncCode, role: syncRole }))
+    } catch {
+      // ignore
+    }
+  }, [syncCode, syncRole])
+
+  // Track connectivity for the status pill.
+  useEffect(() => {
+    const up = () => setOnline(true)
+    const down = () => setOnline(false)
+    window.addEventListener('online', up)
+    window.addEventListener('offline', down)
+    return () => {
+      window.removeEventListener('online', up)
+      window.removeEventListener('offline', down)
+    }
+  }, [])
+
+  // HOST: publish the trip state to the cloud (debounced) whenever it changes.
+  useEffect(() => {
+    const sb = supabase
+    if (!sb || syncRole !== 'host' || !syncCode) return
+    const t = setTimeout(() => {
+      sb.from(GAMES_TABLE)
+        .upsert({ code: syncCode, state, updated_at: new Date().toISOString() })
+        .then(({ error }) => {
+          if (error) console.warn('sync push failed:', error.message)
+        })
+    }, 500)
+    return () => clearTimeout(t)
+  }, [state, syncRole, syncCode])
+
+  // GUEST: fetch the current card, then subscribe to live updates.
+  useEffect(() => {
+    setSubscribed(false)
+    const sb = supabase
+    if (!sb || syncRole !== 'guest' || !syncCode) return
+    let active = true
+
+    sb.from(GAMES_TABLE)
+      .select('state')
+      .eq('code', syncCode)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active && data?.state) setState(data.state as TripState)
+      })
+
+    const channel = sb
+      .channel(`game-${syncCode}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: GAMES_TABLE, filter: `code=eq.${syncCode}` },
+        (payload) => {
+          const next = (payload.new as { state?: TripState })?.state
+          if (active && next) setState(next)
+        },
+      )
+      .subscribe((status) => {
+        if (active) setSubscribed(status === 'SUBSCRIBED')
+      })
+
+    return () => {
+      active = false
+      sb.removeChannel(channel)
+    }
+  }, [syncRole, syncCode])
+
+  const setSync = useCallback((code: string, role: SyncRole) => {
+    const c = normalizeCode(code)
+    setSyncCode(role === 'off' ? '' : c)
+    setSyncRole(role === 'off' || !c ? 'off' : role)
+  }, [])
+
+  const syncStatus: SyncStatus =
+    syncRole === 'off'
+      ? 'off'
+      : !online
+        ? 'offline'
+        : syncRole === 'guest'
+          ? subscribed
+            ? 'live'
+            : 'connecting'
+          : 'live'
 
   const setPlayers = useCallback((players: Player[]) => {
     setState((s) => ({ ...s, players }))
@@ -188,6 +320,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       resetRound,
       resetAll,
       hasPlayers: state.players.length === 4,
+      syncConfigured: SYNC_CONFIGURED,
+      syncCode,
+      syncRole,
+      syncStatus,
+      setSync,
+      readOnly: syncRole === 'guest',
     }),
     [
       state,
@@ -199,6 +337,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setLocked,
       resetRound,
       resetAll,
+      syncCode,
+      syncRole,
+      syncStatus,
+      setSync,
     ],
   )
 

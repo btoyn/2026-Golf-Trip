@@ -5,8 +5,15 @@ import { COURSES } from '../data/courses'
 
 const SHORT_DAY = ['THU', 'FRI', 'SAT', 'SUN']
 
+const SYNC_TEXT: Record<string, string> = {
+  off: 'Live scoreboard',
+  connecting: 'Connecting…',
+  live: 'Live',
+  offline: 'Offline',
+}
+
 export default function Welcome() {
-  const { state } = useStore()
+  const { state, syncConfigured, syncRole, syncStatus } = useStore()
   const { rounds } = state
 
   return (
@@ -36,6 +43,20 @@ export default function Welcome() {
           )
         })}
       </div>
+
+      {syncConfigured && (
+        <Link className="sync-cta" to="/sync">
+          <span className={`sync-dot sync-${syncStatus}`} />
+          <span className="sync-cta-text">
+            {syncRole === 'off'
+              ? 'Live Scoreboard — tap to connect'
+              : syncRole === 'host'
+                ? `Scorekeeper · ${SYNC_TEXT[syncStatus]}`
+                : `Following · ${SYNC_TEXT[syncStatus]}`}
+          </span>
+          <span className="sync-cta-chev">›</span>
+        </Link>
+      )}
 
       <div className="welcome-links">
         <Link to="/instructions">📖 Instructions</Link>

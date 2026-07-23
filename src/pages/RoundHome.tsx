@@ -11,7 +11,7 @@ export default function RoundHome() {
   const { roundId } = useParams()
   const idx = Number(roundId)
   const navigate = useNavigate()
-  const { state, setPairing, resetRound } = useStore()
+  const { state, setPairing, resetRound, readOnly } = useStore()
   const { players, rounds } = state
 
   const round = rounds.find((r) => r.index === idx)
@@ -29,12 +29,19 @@ export default function RoundHome() {
       <TopBar title={course.day} back="/" />
       <div className="content">
         <CoursePhoto courseIndex={idx} courseName={course.name} />
+        {readOnly && (
+          <div className="readonly-banner">👀 Following the scorekeeper — view only</div>
+        )}
         <h1 className="big-head">{course.name}</h1>
         <p className="subhead">{course.day} &middot; Par {course.par.reduce((a, b) => a + b, 0)}</p>
 
         <h2 className="section">Pairings (2 v 2)</h2>
-        {round.locked ? (
-          <p className="muted">Round is locked. Unlock in the summary to change pairings.</p>
+        {round.locked || readOnly ? (
+          <p className="muted">
+            {readOnly
+              ? 'Pairings are set by the scorekeeper.'
+              : 'Round is locked. Unlock in the summary to change pairings.'}
+          </p>
         ) : (
           <div className="segmented" style={{ marginBottom: 12 }}>
             {SPLIT_LABELS.map((label, i) => (
@@ -89,7 +96,7 @@ export default function RoundHome() {
           </Link>
         </div>
 
-        {entered > 0 && (
+        {entered > 0 && !readOnly && (
           <>
             <h2 className="section">Danger Zone</h2>
             <button

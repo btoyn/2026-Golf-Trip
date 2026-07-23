@@ -19,7 +19,7 @@ export default function HoleEntry() {
   const idx = Number(roundId)
   const hole = Number(holeNum) // 1-based
   const navigate = useNavigate()
-  const { state, setScore, setPutts, setLongestPutt } = useStore()
+  const { state, setScore, setPutts, setLongestPutt, readOnly } = useStore()
   const { players, rounds } = state
 
   const round = rounds.find((r) => r.index === idx)
@@ -32,7 +32,7 @@ export default function HoleEntry() {
   const grossEntries = round.gross[h] ?? {}
   const puttEntries = round.putts[h] ?? {}
   const longId = round.longestPutt[h] ?? null
-  const locked = round.locked
+  const locked = round.locked || readOnly
 
   const skins = computeAllSkins(players, round, course)
   const name = (id: string | null) => (id ? players.find((p) => p.id === id)?.name ?? '?' : '?')
@@ -90,10 +90,14 @@ export default function HoleEntry() {
           </button>
         </div>
 
-        {locked && (
-          <p className="muted center" style={{ marginBottom: 8 }}>
-            Round is locked — scores are read-only.
-          </p>
+        {readOnly ? (
+          <div className="readonly-banner">👀 Following the scorekeeper — view only</div>
+        ) : (
+          round.locked && (
+            <p className="muted center" style={{ marginBottom: 8 }}>
+              Round is locked — scores are read-only.
+            </p>
+          )
         )}
 
         {players.map((p) => {

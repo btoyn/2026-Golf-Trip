@@ -24,7 +24,7 @@ export default function RoundSummary() {
   const { roundId } = useParams()
   const idx = Number(roundId)
   const navigate = useNavigate()
-  const { state, setLocked } = useStore()
+  const { state, setLocked, readOnly } = useStore()
   const { players, rounds } = state
 
   const round = rounds.find((r) => r.index === idx)
@@ -149,21 +149,25 @@ export default function RoundSummary() {
             <div className="card center">
               <span className="chip locked">Round Locked / Final</span>
             </div>
-            <button className="btn secondary" onClick={() => setLocked(idx, false)}>
-              Unlock Round
-            </button>
+            {!readOnly && (
+              <button className="btn secondary" onClick={() => setLocked(idx, false)}>
+                Unlock Round
+              </button>
+            )}
           </>
         ) : (
-          <button
-            className="btn"
-            onClick={() => {
-              if (confirm('Lock this round as final? You can unlock later if needed.')) {
-                setLocked(idx, true)
-              }
-            }}
-          >
-            Lock Round as Final
-          </button>
+          !readOnly && (
+            <button
+              className="btn"
+              onClick={() => {
+                if (confirm('Lock this round as final? You can unlock later if needed.')) {
+                  setLocked(idx, true)
+                }
+              }}
+            >
+              Lock Round as Final
+            </button>
+          )
         )}
 
         <div className="btn-row">

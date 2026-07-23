@@ -14,7 +14,7 @@ const LETTERS = ['A', 'B', 'C', 'D']
 const DEFAULT_NAMES = ['Brandon', 'Chase', 'Vance', 'Nate']
 
 export default function Setup() {
-  const { state, setPlayers, resetAll } = useStore()
+  const { state, setPlayers, resetAll, readOnly } = useStore()
   const navigate = useNavigate()
 
   const [drafts, setDrafts] = useState<Draft[]>(() => {
@@ -54,6 +54,11 @@ export default function Setup() {
     <>
       <TopBar title="Trip Setup" back={state.players.length === 4 ? '/' : undefined} />
       <div className="content">
+        {readOnly && (
+          <div className="readonly-banner">
+            👀 Following the scorekeeper — players are set on their phone
+          </div>
+        )}
         <p className="subhead">4 Players &middot; Handicaps</p>
         <p className="muted" style={{ marginTop: 6, marginBottom: 16 }}>
           Enter each player in order (A, B, C, D). Pairings and quota are derived from these.
@@ -74,6 +79,7 @@ export default function Setup() {
                   type="text"
                   value={d.name}
                   placeholder={`Player ${LETTERS[i]}`}
+                  disabled={readOnly}
                   onChange={(e) => update(i, 'name', e.target.value)}
                 />
               </div>
@@ -85,6 +91,7 @@ export default function Setup() {
                   step="0.1"
                   value={d.handicap}
                   placeholder="e.g. 12.4"
+                  disabled={readOnly}
                   onChange={(e) => update(i, 'handicap', e.target.value)}
                 />
               </div>
@@ -97,11 +104,13 @@ export default function Setup() {
           )
         })}
 
-        <button className="btn" disabled={!valid} onClick={save}>
-          Save &amp; Continue
-        </button>
+        {!readOnly && (
+          <button className="btn" disabled={!valid} onClick={save}>
+            Save &amp; Continue
+          </button>
+        )}
 
-        {state.players.length === 4 && (
+        {state.players.length === 4 && !readOnly && (
           <div className="btn-row">
             <button className="btn danger small" onClick={clearTrip}>
               Reset Trip
