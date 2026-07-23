@@ -8,8 +8,8 @@
  *
  * Env vars (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY) take precedence if set.
  */
-const CONST_URL = ''
-const CONST_ANON_KEY = ''
+const CONST_URL = 'https://egrtwvkcoxqcfdvmewyo.supabase.co'
+const CONST_ANON_KEY = 'sb_publishable_QQTiWT5F5YP8Xmeh6i2o7w_Z3LadRnX'
 
 const ENV_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const ENV_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
