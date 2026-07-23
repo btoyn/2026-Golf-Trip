@@ -1,3 +1,4 @@
+/* build marker: redeploy 2 — force Vercel to pick up live-sync credentials */
 /**
  * Supabase connection for the live "follow along" scoreboard.
  *
