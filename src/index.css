@@ -649,9 +649,7 @@ tr:last-child td {
 .course-photo {
   width: 100%;
   height: auto;
-  max-height: 72vh;
   border-radius: 12px;
-  object-fit: contain;
   display: block;
   margin-bottom: 12px;
   box-shadow: var(--shadow);
