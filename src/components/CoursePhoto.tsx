@@ -6,12 +6,32 @@ interface Props {
   courseName: string
 }
 
-/** Course photo that degrades gracefully to a colored panel if missing. */
-export default function CoursePhoto({ courseIndex, courseName }: Props) {
-  const src = COURSE_PHOTOS[courseIndex]
-  const [failed, setFailed] = useState(false)
+/** Build the list of filenames to try from a configured path, swapping extensions. */
+function sourcesFor(path: string): string[] {
+  const base = path.replace(/\.(jpg|jpeg|png|webp)$/i, '')
+  const exts = ['jpg', 'jpeg', 'png', 'webp']
+  const ordered = [path, ...exts.map((e) => `${base}.${e}`)]
+  return [...new Set(ordered)]
+}
 
-  if (!src || failed) {
+/**
+ * Course photo. Tries the configured file (and common extensions) so whatever
+ * image name gets uploaded works, and degrades to a colored panel if none load.
+ */
+export default function CoursePhoto({ courseIndex, courseName }: Props) {
+  const configured = COURSE_PHOTOS[courseIndex]
+  const [idx, setIdx] = useState(0)
+
+  if (!configured) {
+    return (
+      <div className="course-photo-fallback">
+        <span className="cap">{courseName}</span>
+      </div>
+    )
+  }
+
+  const sources = sourcesFor(configured)
+  if (idx >= sources.length) {
     return (
       <div className="course-photo-fallback">
         <span className="cap">{courseName}</span>
@@ -22,9 +42,9 @@ export default function CoursePhoto({ courseIndex, courseName }: Props) {
   return (
     <img
       className="course-photo"
-      src={src}
+      src={sources[idx]}
       alt={courseName}
-      onError={() => setFailed(true)}
+      onError={() => setIdx((i) => i + 1)}
     />
   )
 }

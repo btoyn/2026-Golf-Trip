@@ -648,12 +648,14 @@ tr:last-child td {
 /* ---- Course photo ---- */
 .course-photo {
   width: 100%;
-  height: 150px;
+  height: auto;
+  max-height: 72vh;
   border-radius: 12px;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   margin-bottom: 12px;
   box-shadow: var(--shadow);
+  background: var(--cream);
 }
 
 .course-photo-fallback {
