@@ -5,11 +5,14 @@ import {
   computeLongestPuttSkins,
   computePointsSkins,
   computePuttsSkins,
+  computeVegas,
+  computeWolf,
   holePoints,
   quota,
   quotaPoints,
   strokesReceived,
   teamMatch,
+  wolfForHole,
 } from './scoring'
 
 let failures = 0
@@ -64,9 +67,14 @@ function emptyRound(): Round {
   return {
     index: 0,
     pairing: 0,
+    game: 'stableford',
+    scoring: 'net',
+    tieMode: 'carry',
+    skins: { points: true, putts: true, longest: true },
     gross: Array.from({ length: 18 }, () => ({})),
     putts: Array.from({ length: 18 }, () => ({})),
     longestPutt: Array.from({ length: 18 }, () => null),
+    wolf: Array.from({ length: 18 }, () => null),
     locked: false,
   }
 }
@@ -135,6 +143,82 @@ eq(m.teams[0].points, 6, 'team0 points 6')
 eq(m.teams[1].points, 4, 'team1 points 4')
 eq(m.teams[0].margin, 6 - 72, 'team0 margin')
 eq(m.winner, 0, 'team0 wins (higher margin)')
+
+// ---- Net/Gross toggle ----
+// hcp 18 gets 1 stroke every hole. Gross 5 on par 4: net 4 (par=2pts), gross 5 (bogey=1pt).
+eq(holePoints(5, 18, 4, 1, 'net'), 2, 'net mode: gross5 hcp18 -> net par -> 2')
+eq(holePoints(5, 18, 4, 1, 'gross'), 1, 'gross mode: gross5 -> bogey -> 1')
+
+// ---- Skins toggle off ----
+const roff = emptyRound()
+roff.skins = { points: false, putts: true, longest: true }
+roff.gross[0] = { a: 3, b: 4, c: 4, d: 4 }
+const offSkins = computeAllSkins(players, roff, course)
+eq(offSkins.points.winnings['a'], 0, 'points skin disabled -> no winnings')
+
+// ---- Tie mode wash (skins) ----
+const rw = emptyRound()
+rw.tieMode = 'wash'
+rw.gross[0] = { a: 3, b: 3, c: 4, d: 4 } // tie for best -> wash (no carry)
+rw.gross[1] = { a: 3, b: 4, c: 4, d: 4 } // A alone
+const washSkins = computePointsSkins(players, rw, course)
+eq(washSkins.holes[0].push, true, 'wash h1 push')
+eq(washSkins.holes[1].pot, 0.25, 'wash h2 pot back to base $0.25 (no carry)')
+eq(washSkins.winnings['a'], 0.25, 'wash: A wins only $0.25')
+
+// ---- Vegas ----
+const rv = emptyRound()
+rv.game = 'vegas'
+rv.pairing = 0 // A+B vs C+D
+// A net4 B net5 -> 45 ; C net5 D net6 -> 56 ; diff 11 to team0
+rv.gross[0] = { a: 4, b: 5, c: 5, d: 6 }
+const vegas = computeVegas(players, rv, course)
+eq(vegas.holes[0].numbers, [45, 56], 'vegas h1 numbers 45 vs 56')
+eq(vegas.holes[0].winner, 0, 'vegas h1 team0 wins')
+eq(vegas.points, [11, 0], 'vegas team0 +11')
+// cap at 9: net 12 becomes 9
+const rv2 = emptyRound()
+rv2.game = 'vegas'
+rv2.pairing = 0
+rv2.gross[0] = { a: 4, b: 12, c: 5, d: 6 } // team0: 4 & 9 -> 49 ; team1: 56 ; team1 wins 56<49? no 49<56 team0 wins diff7
+eq(computeVegas(players, rv2, course).holes[0].numbers, [49, 56], 'vegas caps 12 at 9 -> 49')
+
+// ---- Wolf ----
+eq(wolfForHole(players, 0), 'a', 'wolf hole1 = A')
+eq(wolfForHole(players, 1), 'b', 'wolf hole2 = B')
+eq(wolfForHole(players, 4), 'a', 'wolf hole5 = A (rotates)')
+
+// Wolf partner win: A wolf picks B. A+B combined 7 vs C+D combined 9 -> wolf team wins.
+const rwolf = emptyRound()
+rwolf.game = 'wolf'
+rwolf.wolf[0] = { mode: 'partner', partnerId: 'b' }
+rwolf.gross[0] = { a: 3, b: 4, c: 4, d: 5 } // A+B=7, C+D=9
+let wres = computeWolf(players, rwolf, course)
+eq(wres.holes[0].outcome, 'wolf', 'wolf partner win outcome')
+eq(wres.points['a'], 2, 'wolf partner win: A +2')
+eq(wres.points['b'], 2, 'wolf partner win: B +2')
+eq(wres.points['c'], -2, 'wolf partner win: C -2')
+eq(wres.points['d'], -2, 'wolf partner win: D -2')
+
+// Lone wolf win: A alone (3) beats best of others (min 4) -> +2 from each of 3 = +6
+const rlone = emptyRound()
+rlone.game = 'wolf'
+rlone.wolf[0] = { mode: 'lone', partnerId: null }
+rlone.gross[0] = { a: 3, b: 4, c: 5, d: 6 }
+wres = computeWolf(players, rlone, course)
+eq(wres.points['a'], 6, 'lone win: A +6')
+eq(wres.points['b'], -2, 'lone win: B -2')
+eq(wres.points['c'], -2, 'lone win: C -2')
+eq(wres.points['d'], -2, 'lone win: D -2')
+
+// Blind lone loss: A alone (6) worse than best other (3) -> -3 to each of 3 = -9
+const rblind = emptyRound()
+rblind.game = 'wolf'
+rblind.wolf[0] = { mode: 'blind', partnerId: null }
+rblind.gross[0] = { a: 6, b: 3, c: 4, d: 5 }
+wres = computeWolf(players, rblind, course)
+eq(wres.points['a'], -9, 'blind lone loss: A -9')
+eq(wres.points['b'], 3, 'blind lone loss: B +3')
 
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`)

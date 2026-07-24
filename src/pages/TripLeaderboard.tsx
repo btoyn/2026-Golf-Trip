@@ -2,31 +2,28 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import TopBar from '../components/TopBar'
 import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
-import { computeAllSkins, playerRoundLines, teamMatch } from '../lib/scoring'
+import {
+  computeAllSkins,
+  computeVegas,
+  computeWolf,
+  playerRoundLines,
+  teamMatch,
+} from '../lib/scoring'
 
 function money(n: number) {
   const r = Math.round(n * 100) / 100
   return Number.isInteger(r) ? `$${r}` : `$${r.toFixed(2)}`
 }
-
 function signedMoney(n: number) {
   if (n === 0) return '$0'
-  const sign = n < 0 ? '-' : '+'
-  return `${sign}${money(Math.abs(n))}`
+  return `${n < 0 ? '-' : '+'}${money(Math.abs(n))}`
 }
-
 function signed(n: number) {
   const cls = n > 0 ? 'pos' : n < 0 ? 'neg' : ''
   return <span className={cls}>{n > 0 ? `+${n}` : n}</span>
 }
 
-interface Agg {
-  margin: number
-  skins: number
-  wins: number
-  losses: number
-  ties: number
-}
+const GAME_SHORT: Record<string, string> = { stableford: 'Stableford', vegas: 'Vegas', wolf: 'Wolf' }
 
 export default function TripLeaderboard() {
   const { state } = useStore()
@@ -35,93 +32,159 @@ export default function TripLeaderboard() {
 
   if (players.length !== 4) return <Navigate to="/" replace />
 
-  const agg: Record<string, Agg> = {}
-  players.forEach((p) => (agg[p.id] = { margin: 0, skins: 0, wins: 0, losses: 0, ties: 0 }))
+  const zero = () => Object.fromEntries(players.map((p) => [p.id, 0])) as Record<string, number>
+  const stableMargin = zero()
+  const vegasPts = zero()
+  const wolfPts = zero()
+  const skinsTotal = zero()
+  const wlt = Object.fromEntries(
+    players.map((p) => [p.id, { w: 0, l: 0, t: 0 }]),
+  ) as Record<string, { w: number; l: number; t: number }>
 
-  let totalSkinsPot = 0
+  let anyStable = false
+  let anyVegas = false
+  let anyWolf = false
+  let totalSkins = 0
 
   rounds.forEach((round) => {
     const course = COURSES[round.index]
-    const lines = playerRoundLines(players, round, course)
-    lines.forEach((l) => (agg[l.playerId].margin += l.margin))
+    const played = round.gross.some((h) => Object.keys(h).length > 0)
 
     const skins = computeAllSkins(players, round, course)
-    players.forEach((p) => (agg[p.id].skins += skins.total[p.id] ?? 0))
-    totalSkinsPot += players.reduce((s, p) => s + (skins.total[p.id] ?? 0), 0)
-
-    // Only score the match record for rounds that have been played at all.
-    const played = round.gross.some((h) => Object.keys(h).length > 0)
-    if (!played) return
-    const match = teamMatch(players, round, course)
-    match.teams.forEach((t, i) => {
-      const res =
-        match.winner === null ? 'tie' : match.winner === i ? 'win' : 'loss'
-      t.playerIds.forEach((pid) => {
-        if (res === 'win') agg[pid].wins++
-        else if (res === 'loss') agg[pid].losses++
-        else agg[pid].ties++
-      })
+    players.forEach((p) => {
+      skinsTotal[p.id] += skins.total[p.id] ?? 0
+      totalSkins += skins.total[p.id] ?? 0
     })
+
+    if (round.game === 'stableford') {
+      anyStable = true
+      playerRoundLines(players, round, course).forEach((l) => (stableMargin[l.playerId] += l.margin))
+      if (played) {
+        const match = teamMatch(players, round, course)
+        match.teams.forEach((t, i) => {
+          const res = match.winner === null ? 't' : match.winner === i ? 'w' : 'l'
+          t.playerIds.forEach((pid) => (wlt[pid][res] += 1))
+        })
+      }
+    } else if (round.game === 'vegas') {
+      anyVegas = true
+      const v = computeVegas(players, round, course)
+      v.teams.forEach((team, i) => team.forEach((pid) => (vegasPts[pid] += v.points[i])))
+    } else if (round.game === 'wolf') {
+      anyWolf = true
+      const w = computeWolf(players, round, course)
+      players.forEach((p) => (wolfPts[p.id] += w.points[p.id]))
+    }
   })
 
-  const share = totalSkinsPot / players.length
-  const name = (id: string) => players.find((p) => p.id === id)?.name ?? '?'
-
-  const ranked = [...players].sort((a, b) => agg[b.id].margin - agg[a.id].margin)
+  const share = totalSkins / players.length
+  const rankBy = (m: Record<string, number>) => [...players].sort((a, b) => m[b.id] - m[a.id])
 
   return (
     <>
       <TopBar title="Trip Leaderboard" back="/" />
       <div className="content">
-        <h2 className="section">Best Golfer — Quota Margin</h2>
-        <p className="muted" style={{ marginTop: 0, marginBottom: 10 }}>
-          Cumulative net quota points across all four rounds. Partners rotate, so this is the
-          truest individual ranking.
-        </p>
-        <div className="card" style={{ padding: 0 }}>
-          <table>
-            <thead>
-              <tr>
-                <th className="left">#</th>
-                <th className="left">Player</th>
-                <th>Margin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranked.map((p, i) => (
-                <tr key={p.id}>
-                  <td className="left pos">{i + 1}</td>
-                  <td className="left">{p.name}</td>
-                  <td>{signed(agg[p.id].margin)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {anyStable && (
+          <>
+            <h2 className="section">Best Golfer — Quota Margin</h2>
+            <p className="muted" style={{ marginTop: 0, marginBottom: 10 }}>
+              Cumulative net quota margin across Stableford rounds. Partners rotate, so this is the
+              truest individual ranking.
+            </p>
+            <div className="card" style={{ padding: 0 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th className="left">#</th>
+                    <th className="left">Player</th>
+                    <th>Margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankBy(stableMargin).map((p, i) => (
+                    <tr key={p.id}>
+                      <td className="left pos">{i + 1}</td>
+                      <td className="left">{p.name}</td>
+                      <td>{signed(stableMargin[p.id])}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-        <h2 className="section">Team Match Record</h2>
-        <div className="card" style={{ padding: 0 }}>
-          <table>
-            <thead>
-              <tr>
-                <th className="left">Player</th>
-                <th>W</th>
-                <th>L</th>
-                <th>T</th>
-              </tr>
-            </thead>
-            <tbody>
-              {players.map((p) => (
-                <tr key={p.id}>
-                  <td className="left">{p.name}</td>
-                  <td className="pos">{agg[p.id].wins}</td>
-                  <td className="neg">{agg[p.id].losses}</td>
-                  <td>{agg[p.id].ties}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            <h2 className="section">Team Match Record</h2>
+            <div className="card" style={{ padding: 0 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th className="left">Player</th>
+                    <th>W</th>
+                    <th>L</th>
+                    <th>T</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {players.map((p) => (
+                    <tr key={p.id}>
+                      <td className="left">{p.name}</td>
+                      <td className="pos">{wlt[p.id].w}</td>
+                      <td className="neg">{wlt[p.id].l}</td>
+                      <td>{wlt[p.id].t}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {anyVegas && (
+          <>
+            <h2 className="section">Vegas — Trip Points</h2>
+            <div className="card" style={{ padding: 0 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th className="left">Player</th>
+                    <th>Points</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankBy(vegasPts).map((p) => (
+                    <tr key={p.id}>
+                      <td className="left">{p.name}</td>
+                      <td>{signed(vegasPts[p.id])}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {anyWolf && (
+          <>
+            <h2 className="section">Wolf — Trip Points</h2>
+            <div className="card" style={{ padding: 0 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th className="left">Player</th>
+                    <th>Points</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankBy(wolfPts).map((p) => (
+                    <tr key={p.id}>
+                      <td className="left">{p.name}</td>
+                      <td>{signed(wolfPts[p.id])}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
 
         <h2 className="section">Skins — Trip Total</h2>
         <div className="card" style={{ padding: 0 }}>
@@ -134,40 +197,29 @@ export default function TripLeaderboard() {
               </tr>
             </thead>
             <tbody>
-              {[...players]
-                .sort((a, b) => agg[b.id].skins - agg[a.id].skins)
-                .map((p) => {
-                  const net = agg[p.id].skins - share
-                  return (
-                    <tr key={p.id}>
-                      <td className="left">{p.name}</td>
-                      <td className="money">{money(agg[p.id].skins)}</td>
-                      <td className={`money ${net > 0 ? 'pos' : net < 0 ? 'neg' : ''}`}>
-                        {signedMoney(net)}
-                      </td>
-                    </tr>
-                  )
-                })}
+              {rankBy(skinsTotal).map((p) => {
+                const net = skinsTotal[p.id] - share
+                return (
+                  <tr key={p.id}>
+                    <td className="left">{p.name}</td>
+                    <td className="money">{money(skinsTotal[p.id])}</td>
+                    <td className={`money ${net > 0 ? 'pos' : net < 0 ? 'neg' : ''}`}>
+                      {signedMoney(net)}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
         <p className="muted" style={{ marginTop: 6 }}>
-          {money(totalSkinsPot)} awarded across the trip. Net settles everyone against an equal share.
+          {money(totalSkins)} awarded across the trip. Net settles everyone against an equal share.
         </p>
 
         <h2 className="section">Rounds</h2>
         {rounds.map((r) => {
           const course = COURSES[r.index]
           const played = r.gross.some((h) => Object.keys(h).length > 0)
-          const match = teamMatch(players, r, course)
-          const label =
-            !played
-              ? 'Not started'
-              : match.winner === null
-                ? 'Tied'
-                : `${name(match.teams[match.winner].playerIds[0])} + ${name(
-                    match.teams[match.winner].playerIds[1],
-                  )}`
           return (
             <div
               className="card link"
@@ -178,7 +230,7 @@ export default function TripLeaderboard() {
               <div>
                 <div className="card-title">{course.day}</div>
                 <div className="muted">
-                  Match: {label}
+                  {GAME_SHORT[r.game]} · {played ? `${r.scoring === 'net' ? 'Net' : 'Gross'}` : 'Not started'}
                   {r.locked && ' · Final'}
                 </div>
               </div>

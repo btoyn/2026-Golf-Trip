@@ -1,4 +1,4 @@
-import type { Course, PairingSplit, Player, Round } from '../types'
+import type { Course, PairingSplit, Player, Round, ScoringMode, WolfMode } from '../types'
 
 /** Quota = 36 - handicap (handicap may be decimal). */
 export function quota(handicap: number): number {
@@ -22,6 +22,19 @@ export function netScore(gross: number, handicap: number, strokeIndex: number): 
 }
 
 /**
+ * The score used for scoring a hole, honoring the round's net/gross toggle.
+ * In gross mode the raw strokes are used; in net mode handicap strokes apply.
+ */
+export function effectiveScore(
+  gross: number,
+  handicap: number,
+  strokeIndex: number,
+  mode: ScoringMode,
+): number {
+  return mode === 'gross' ? gross : netScore(gross, handicap, strokeIndex)
+}
+
+/**
  * Quota points from NET score vs par. Never negative.
  *   net eagle or better (<= par-2): 4
  *   net birdie (par-1): 3
@@ -38,14 +51,15 @@ export function quotaPoints(net: number, par: number): number {
   return 0
 }
 
-/** Quota points for a player on a hole directly from gross. */
+/** Quota points for a player on a hole, honoring the net/gross mode. */
 export function holePoints(
   gross: number,
   handicap: number,
   par: number,
   strokeIndex: number,
+  mode: ScoringMode = 'net',
 ): number {
-  return quotaPoints(netScore(gross, handicap, strokeIndex), par)
+  return quotaPoints(effectiveScore(gross, handicap, strokeIndex, mode), par)
 }
 
 /** Every skin (all three games) is worth 25 cents per hole. */
@@ -75,10 +89,23 @@ export interface SkinGameResult {
  * the pot carries forward. `values[h]` is a map of playerId -> comparable
  * number for that hole, or null when the hole isn't fully entered yet.
  */
+function emptySkin(players: Player[]): SkinGameResult {
+  const winnings: Record<string, number> = {}
+  players.forEach((p) => (winnings[p.id] = 0))
+  const holes: SkinHoleResult[] = Array.from({ length: 18 }, () => ({
+    winnerId: null,
+    pot: 0,
+    push: false,
+    complete: false,
+  }))
+  return { holes, winnings, potCarrying: 0 }
+}
+
 function carrySkins(
   players: Player[],
   values: (Record<string, number> | null)[],
   mode: 'high' | 'low',
+  tieMode: 'wash' | 'carry',
   unit = SKIN_UNIT,
 ): SkinGameResult {
   const winnings: Record<string, number> = {}
@@ -105,39 +132,42 @@ function carrySkins(
       carry = 0
     } else {
       holes.push({ winnerId: null, pot, push: true, complete: true })
-      carry = pot
+      // carry+stack, or wash (pot forfeited, next hole starts fresh)
+      carry = tieMode === 'carry' ? pot : 0
     }
   }
 
   return { holes, winnings, potCarrying: carry }
 }
 
-/** Skin game 1: outright highest quota points on the hole (net-based). */
+/** Skin game 1: outright best quota points on the hole. */
 export function computePointsSkins(
   players: Player[],
   round: Round,
   course: Course,
 ): SkinGameResult {
+  if (!round.skins.points) return emptySkin(players)
   const values = round.gross.map((entries, h) => {
     if (!players.every((p) => typeof entries[p.id] === 'number')) return null
     const m: Record<string, number> = {}
     players.forEach((p) => {
-      m[p.id] = holePoints(entries[p.id], p.handicap, course.par[h], course.si[h])
+      m[p.id] = holePoints(entries[p.id], p.handicap, course.par[h], course.si[h], round.scoring)
     })
     return m
   })
-  return carrySkins(players, values, 'high')
+  return carrySkins(players, values, 'high', round.tieMode)
 }
 
 /** Skin game 2: fewest putts on the hole. Ties push and carry. */
 export function computePuttsSkins(players: Player[], round: Round): SkinGameResult {
+  if (!round.skins.putts) return emptySkin(players)
   const values = round.putts.map((entries) => {
     if (!players.every((p) => typeof entries[p.id] === 'number')) return null
     const m: Record<string, number> = {}
     players.forEach((p) => (m[p.id] = entries[p.id]))
     return m
   })
-  return carrySkins(players, values, 'low')
+  return carrySkins(players, values, 'low', round.tieMode)
 }
 
 /**
@@ -145,6 +175,7 @@ export function computePuttsSkins(players: Player[], round: Round): SkinGameResu
  * marked player takes one unit for that hole.
  */
 export function computeLongestPuttSkins(players: Player[], round: Round, unit = SKIN_UNIT): SkinGameResult {
+  if (!round.skins.longest) return emptySkin(players)
   const winnings: Record<string, number> = {}
   players.forEach((p) => (winnings[p.id] = 0))
   const holes: SkinHoleResult[] = round.longestPutt.map((winnerId) => {
@@ -161,8 +192,10 @@ export interface AllSkins {
   points: SkinGameResult
   putts: SkinGameResult
   longest: SkinGameResult
-  /** Combined winnings across all three games, per player id. */
+  /** Combined winnings across all enabled games, per player id. */
   total: Record<string, number>
+  /** True if any of the three skins games is enabled this round. */
+  any: boolean
 }
 
 /** Compute all three skin games plus a combined per-player total. */
@@ -175,7 +208,13 @@ export function computeAllSkins(players: Player[], round: Round, course: Course)
     total[p.id] =
       points.winnings[p.id] + putts.winnings[p.id] + longest.winnings[p.id]
   })
-  return { points, putts, longest, total }
+  return {
+    points,
+    putts,
+    longest,
+    total,
+    any: round.skins.points || round.skins.putts || round.skins.longest,
+  }
 }
 
 export interface PlayerRoundLine {
@@ -199,7 +238,7 @@ export function playerRoundLines(
     for (let h = 0; h < 18; h++) {
       const g = round.gross[h]?.[p.id]
       if (typeof g === 'number') {
-        points += holePoints(g, p.handicap, course.par[h], course.si[h])
+        points += holePoints(g, p.handicap, course.par[h], course.si[h], round.scoring)
         holesPlayed++
       }
     }
@@ -272,4 +311,187 @@ export function teamMatch(players: Player[], round: Round, course: Course): Matc
   else if (team1.margin > team0.margin) winner = 1
 
   return { teams: [team0, team1], winner }
+}
+
+// ---------------------------------------------------------------------------
+// Vegas
+// ---------------------------------------------------------------------------
+
+export interface VegasHole {
+  /** Two-digit team numbers [team0, team1], or null if the hole isn't complete. */
+  numbers: [number, number] | null
+  diff: number
+  /** 0 or 1 index of the winning team, or null on a tie. */
+  winner: number | null
+  complete: boolean
+}
+
+export interface VegasResult {
+  holes: VegasHole[]
+  /** Running point totals [team0, team1]. */
+  points: [number, number]
+  teams: [[string, string], [string, string]]
+}
+
+/**
+ * Vegas: the round's two pairs each form a two-digit number from their
+ * (capped-at-9) scores, low digit first. The difference goes to the low team.
+ */
+export function computeVegas(players: Player[], round: Round, course: Course): VegasResult {
+  const [t0, t1] = teamsForSplit(round.pairing)
+  const points: [number, number] = [0, 0]
+  const holes: VegasHole[] = []
+
+  const teamNumber = (idx: [number, number], h: number, entries: Record<string, number>) => {
+    const a = players[idx[0]]
+    const b = players[idx[1]]
+    const sa = Math.min(9, effectiveScore(entries[a.id], a.handicap, course.si[h], round.scoring))
+    const sb = Math.min(9, effectiveScore(entries[b.id], b.handicap, course.si[h], round.scoring))
+    const lo = Math.min(sa, sb)
+    const hi = Math.max(sa, sb)
+    return lo * 10 + hi
+  }
+
+  for (let h = 0; h < 18; h++) {
+    const entries = round.gross[h] ?? {}
+    const need = [...t0, ...t1].map((i) => players[i].id)
+    if (!need.every((id) => typeof entries[id] === 'number')) {
+      holes.push({ numbers: null, diff: 0, winner: null, complete: false })
+      continue
+    }
+    const n0 = teamNumber(t0, h, entries)
+    const n1 = teamNumber(t1, h, entries)
+    let winner: number | null = null
+    let diff = 0
+    if (n0 < n1) {
+      winner = 0
+      diff = n1 - n0
+      points[0] += diff
+    } else if (n1 < n0) {
+      winner = 1
+      diff = n0 - n1
+      points[1] += diff
+    }
+    holes.push({ numbers: [n0, n1], diff, winner, complete: true })
+  }
+
+  return {
+    holes,
+    points,
+    teams: [
+      [players[t0[0]].id, players[t0[1]].id],
+      [players[t1[0]].id, players[t1[1]].id],
+    ],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wolf
+// ---------------------------------------------------------------------------
+
+export type WolfOutcome = 'wolf' | 'opp' | 'tie' | 'pending'
+
+export interface WolfHole {
+  wolfId: string
+  mode: WolfMode | null
+  partnerId: string | null
+  wolfTeam: string[]
+  oppTeam: string[]
+  outcome: WolfOutcome
+  /** Stake for the hole (1, times any carried ties). */
+  base: number
+  /** Point change per player id for this hole. */
+  deltas: Record<string, number>
+}
+
+export interface WolfResult {
+  holes: WolfHole[]
+  points: Record<string, number>
+}
+
+/** The player id who is the Wolf on a given hole (rotates by tee/setup order). */
+export function wolfForHole(players: Player[], hole: number): string {
+  return players[hole % players.length].id
+}
+
+/**
+ * Wolf: one rotating Wolf per hole either partners up (2v2), goes Lone (2x)
+ * or Blind Lone (3x). Teams are scored by combined total; a Lone Wolf plays
+ * their single score against the best of the other three.
+ */
+export function computeWolf(players: Player[], round: Round, course: Course): WolfResult {
+  const points: Record<string, number> = {}
+  players.forEach((p) => (points[p.id] = 0))
+  const holes: WolfHole[] = []
+  let carry = 0
+
+  const eff = (id: string, h: number, entries: Record<string, number>) => {
+    const p = players.find((x) => x.id === id)!
+    return effectiveScore(entries[id], p.handicap, course.si[h], round.scoring)
+  }
+
+  for (let h = 0; h < 18; h++) {
+    const wolfId = wolfForHole(players, h)
+    const call = round.wolf[h]
+    const entries = round.gross[h] ?? {}
+    const deltas: Record<string, number> = {}
+    players.forEach((p) => (deltas[p.id] = 0))
+
+    // Build teams from the call.
+    let wolfTeam: string[] = [wolfId]
+    let oppTeam: string[] = players.filter((p) => p.id !== wolfId).map((p) => p.id)
+    if (call?.mode === 'partner' && call.partnerId) {
+      wolfTeam = [wolfId, call.partnerId]
+      oppTeam = players.filter((p) => p.id !== wolfId && p.id !== call.partnerId).map((p) => p.id)
+    }
+
+    const allEntered = players.every((p) => typeof entries[p.id] === 'number')
+
+    if (!call || !allEntered) {
+      holes.push({
+        wolfId,
+        mode: call?.mode ?? null,
+        partnerId: call?.partnerId ?? null,
+        wolfTeam,
+        oppTeam,
+        outcome: 'pending',
+        base: round.tieMode === 'carry' ? 1 + carry : 1,
+        deltas,
+      })
+      continue
+    }
+
+    // Team scores.
+    const wolfScore =
+      call.mode === 'partner'
+        ? wolfTeam.reduce((sum, id) => sum + eff(id, h, entries), 0)
+        : eff(wolfId, h, entries)
+    const oppScore =
+      call.mode === 'partner'
+        ? oppTeam.reduce((sum, id) => sum + eff(id, h, entries), 0)
+        : Math.min(...oppTeam.map((id) => eff(id, h, entries)))
+
+    const base = round.tieMode === 'carry' ? 1 + carry : 1
+    const mult = call.mode === 'partner' ? 1 : call.mode === 'lone' ? 2 : 3
+    const perOpp = base * mult
+
+    let outcome: WolfOutcome
+    if (wolfScore === oppScore) {
+      outcome = 'tie'
+      if (round.tieMode === 'carry') carry += 1
+    } else {
+      const wolfWins = wolfScore < oppScore
+      const winners = wolfWins ? wolfTeam : oppTeam
+      const losers = wolfWins ? oppTeam : wolfTeam
+      winners.forEach((id) => (deltas[id] += perOpp * losers.length))
+      losers.forEach((id) => (deltas[id] -= perOpp * winners.length))
+      outcome = wolfWins ? 'wolf' : 'opp'
+      carry = 0
+    }
+
+    players.forEach((p) => (points[p.id] += deltas[p.id]))
+    holes.push({ wolfId, mode: call.mode, partnerId: call.partnerId, wolfTeam, oppTeam, outcome, base, deltas })
+  }
+
+  return { holes, points }
 }

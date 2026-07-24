@@ -1064,3 +1064,129 @@ tr:last-child td {
   font-size: 12px;
   margin-bottom: 12px;
 }
+
+/* ---- Wolf controls ---- */
+.wolf-box {
+  background: var(--white);
+  border: 2px solid var(--orange);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+
+.wolf-head {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 15px;
+  margin-bottom: 10px;
+  color: var(--forest);
+}
+
+.wolf-teams {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--olive-dark);
+  text-align: center;
+}
+
+.player-card.is-wolf {
+  border-color: var(--orange);
+  background: rgba(212, 104, 42, 0.06);
+}
+
+/* ---- Per-hole game result ---- */
+.game-result {
+  background: var(--white);
+  border: 1px solid var(--cream-dark);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 14px;
+  box-shadow: var(--shadow);
+}
+
+.gr-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  padding: 4px 0;
+}
+
+.gr-row b {
+  font-size: 18px;
+  color: var(--forest);
+}
+
+.gr-foot {
+  margin-top: 8px;
+  text-align: center;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 13px;
+  color: var(--orange-dark);
+}
+
+/* ---- Scorecard grid ---- */
+.scorecard-scroll {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--cream-dark);
+  box-shadow: var(--shadow);
+  background: var(--white);
+}
+
+table.scorecard {
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+  min-width: 100%;
+}
+
+table.scorecard th,
+table.scorecard td {
+  text-align: center;
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--cream-dark);
+  border-right: 1px solid var(--cream-dark);
+}
+
+table.scorecard th {
+  background: var(--forest);
+  color: var(--cream);
+  font-size: 11px;
+}
+
+table.scorecard .sc-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left;
+  font-weight: 800;
+  background: var(--paper);
+  min-width: 82px;
+}
+
+table.scorecard th.sc-name {
+  background: var(--forest);
+}
+
+table.scorecard .sc-par td,
+table.scorecard tr.sc-par td {
+  color: var(--olive-dark);
+  font-weight: 700;
+  background: var(--cream);
+}
+
+table.scorecard .sc-tot {
+  font-weight: 800;
+  color: var(--forest);
+  background: var(--cream);
+}
+
+table.scorecard tbody td {
+  font-weight: 700;
+}

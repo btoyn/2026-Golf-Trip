@@ -4,9 +4,12 @@ import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
 import {
   computeAllSkins,
+  computeVegas,
+  computeWolf,
+  effectiveScore,
   holePoints,
-  netScore,
   strokesReceived,
+  wolfForHole,
   type SkinHoleResult,
 } from '../lib/scoring'
 
@@ -19,7 +22,7 @@ export default function HoleEntry() {
   const idx = Number(roundId)
   const hole = Number(holeNum) // 1-based
   const navigate = useNavigate()
-  const { state, setScore, setPutts, setLongestPutt, readOnly } = useStore()
+  const { state, setScore, setPutts, setLongestPutt, setWolfCall, readOnly } = useStore()
   const { players, rounds } = state
 
   const round = rounds.find((r) => r.index === idx)
@@ -33,8 +36,14 @@ export default function HoleEntry() {
   const puttEntries = round.putts[h] ?? {}
   const longId = round.longestPutt[h] ?? null
   const locked = round.locked || readOnly
+  const mode = round.scoring
 
   const skins = computeAllSkins(players, round, course)
+  const vegas = round.game === 'vegas' ? computeVegas(players, round, course) : null
+  const wolf = round.game === 'wolf' ? computeWolf(players, round, course) : null
+  const wolfId = wolfForHole(players, h)
+  const wolfCall = round.wolf[h]
+
   const name = (id: string | null) => (id ? players.find((p) => p.id === id)?.name ?? '?' : '?')
 
   const changeGross = (playerId: string, delta: number) => {
@@ -47,7 +56,6 @@ export default function HoleEntry() {
     const n = Math.max(1, Math.round(Number(raw)))
     if (!Number.isNaN(n)) setScore(idx, h, playerId, n)
   }
-
   const changePutts = (playerId: string, delta: number) => {
     const cur = puttEntries[playerId]
     const base = typeof cur === 'number' ? cur : 0
@@ -58,10 +66,11 @@ export default function HoleEntry() {
     const n = Math.max(0, Math.round(Number(raw)))
     if (!Number.isNaN(n)) setPutts(idx, h, playerId, n)
   }
-
   const toggleLong = (playerId: string) => {
     setLongestPutt(idx, h, longId === playerId ? null : playerId)
   }
+
+  const otherPlayers = players.filter((p) => p.id !== wolfId)
 
   return (
     <>
@@ -78,7 +87,7 @@ export default function HoleEntry() {
           <div className="hole-badge">
             <div className="num">HOLE {hole}</div>
             <div className="meta">
-              Par {par} &middot; SI {si}
+              Par {par} &middot; SI {si} &middot; {mode === 'net' ? 'Net' : 'Gross'}
             </div>
           </div>
           <button
@@ -100,23 +109,82 @@ export default function HoleEntry() {
           )
         )}
 
+        {/* Wolf call controls */}
+        {round.game === 'wolf' && (
+          <div className="wolf-box">
+            <div className="wolf-head">🐺 Wolf this hole: {name(wolfId)}</div>
+            <div className="segmented">
+              <button
+                className={wolfCall?.mode === 'partner' ? 'active' : ''}
+                disabled={locked}
+                onClick={() =>
+                  setWolfCall(idx, h, { mode: 'partner', partnerId: wolfCall?.partnerId ?? null })
+                }
+              >
+                Partner
+              </button>
+              <button
+                className={wolfCall?.mode === 'lone' ? 'active' : ''}
+                disabled={locked}
+                onClick={() => setWolfCall(idx, h, { mode: 'lone', partnerId: null })}
+              >
+                Lone 2×
+              </button>
+              <button
+                className={wolfCall?.mode === 'blind' ? 'active' : ''}
+                disabled={locked}
+                onClick={() => setWolfCall(idx, h, { mode: 'blind', partnerId: null })}
+              >
+                Blind 3×
+              </button>
+            </div>
+            {wolfCall?.mode === 'partner' && (
+              <div className="segmented" style={{ marginTop: 8 }}>
+                {otherPlayers.map((p) => (
+                  <button
+                    key={p.id}
+                    className={wolfCall.partnerId === p.id ? 'active' : ''}
+                    disabled={locked}
+                    onClick={() => setWolfCall(idx, h, { mode: 'partner', partnerId: p.id })}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="wolf-teams">
+              {!wolfCall && 'Wolf must choose: partner, lone, or blind lone.'}
+              {wolfCall?.mode === 'partner' &&
+                (wolfCall.partnerId
+                  ? `${name(wolfId)} + ${name(wolfCall.partnerId)} vs the other two`
+                  : 'Pick a partner above.')}
+              {wolfCall?.mode === 'lone' && `${name(wolfId)} alone vs the other three (2×)`}
+              {wolfCall?.mode === 'blind' && `${name(wolfId)} BLIND vs the other three (3×)`}
+            </div>
+          </div>
+        )}
+
         {players.map((p) => {
           const g = grossEntries[p.id]
           const hasG = typeof g === 'number'
           const sr = strokesReceived(p.handicap, si)
-          const net = hasG ? netScore(g, p.handicap, si) : null
-          const pts = hasG ? holePoints(g, p.handicap, par, si) : null
+          const eff = hasG ? effectiveScore(g, p.handicap, si, mode) : null
+          const pts = hasG ? holePoints(g, p.handicap, par, si, mode) : null
           const pu = puttEntries[p.id]
           const hasP = typeof pu === 'number'
           const isLong = longId === p.id
+          const isWolf = round.game === 'wolf' && p.id === wolfId
           return (
-            <div className="player-card" key={p.id}>
+            <div className={`player-card ${isWolf ? 'is-wolf' : ''}`} key={p.id}>
               <div className="pc-main">
                 <div className="who">
-                  <div className="name">{p.name}</div>
+                  <div className="name">
+                    {isWolf && '🐺 '}
+                    {p.name}
+                  </div>
                   <div className="sub">
                     {sr > 0 ? `${sr} stk` : 'no stk'}
-                    {net !== null && <> &middot; net {net}</>}
+                    {eff !== null && <> &middot; {mode === 'net' ? `net ${eff}` : `gross ${g}`}</>}
                   </div>
                 </div>
                 <div className="stepper">
@@ -173,12 +241,71 @@ export default function HoleEntry() {
           )
         })}
 
-        {/* Three skin games for this hole */}
-        <div className="hole-skins">
-          <SkinLine label="Points" res={skins.points.holes[h]} winner={name} incomplete="enter 4 scores" />
-          <SkinLine label="Fewest putts" res={skins.putts.holes[h]} winner={name} incomplete="enter 4 putts" />
-          <LongPuttLine longId={longId} name={name} />
-        </div>
+        {/* Vegas result for this hole */}
+        {vegas && (
+          <div className="game-result">
+            {vegas.holes[h].complete ? (
+              <>
+                <div className="gr-row">
+                  <span>
+                    {name(vegas.teams[0][0])} + {name(vegas.teams[0][1])}
+                  </span>
+                  <b>{vegas.holes[h].numbers?.[0]}</b>
+                </div>
+                <div className="gr-row">
+                  <span>
+                    {name(vegas.teams[1][0])} + {name(vegas.teams[1][1])}
+                  </span>
+                  <b>{vegas.holes[h].numbers?.[1]}</b>
+                </div>
+                <div className="gr-foot">
+                  {vegas.holes[h].winner === null
+                    ? 'Tied — 0 points'
+                    : `+${vegas.holes[h].diff} to ${name(
+                        vegas.teams[vegas.holes[h].winner as number][0],
+                      )} + ${name(vegas.teams[vegas.holes[h].winner as number][1])}`}
+                </div>
+              </>
+            ) : (
+              <div className="gr-foot">Vegas: enter all 4 scores</div>
+            )}
+          </div>
+        )}
+
+        {/* Wolf result for this hole */}
+        {wolf && (
+          <div className="game-result">
+            {wolf.holes[h].outcome === 'pending' ? (
+              <div className="gr-foot">
+                Wolf: {wolfCall ? 'enter all 4 scores' : 'set the Wolf call above'}
+              </div>
+            ) : wolf.holes[h].outcome === 'tie' ? (
+              <div className="gr-foot">
+                Tied — {round.tieMode === 'carry' ? 'carries to next hole' : 'washed'}
+              </div>
+            ) : (
+              <div className="gr-foot">
+                {players
+                  .filter((p) => wolf.holes[h].deltas[p.id] !== 0)
+                  .map((p) => `${p.name} ${wolf.holes[h].deltas[p.id] > 0 ? '+' : ''}${wolf.holes[h].deltas[p.id]}`)
+                  .join(' · ')}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Enabled skins for this hole */}
+        {skins.any && (
+          <div className="hole-skins">
+            {round.skins.points && (
+              <SkinLine label="Points" res={skins.points.holes[h]} winner={name} incomplete="enter 4 scores" />
+            )}
+            {round.skins.putts && (
+              <SkinLine label="Fewest putts" res={skins.putts.holes[h]} winner={name} incomplete="enter 4 putts" />
+            )}
+            {round.skins.longest && <LongPuttLine longId={longId} name={name} />}
+          </div>
+        )}
 
         <div className="btn-row">
           <button
@@ -200,6 +327,9 @@ export default function HoleEntry() {
         </div>
 
         <div className="btn-row">
+          <button className="btn secondary small" onClick={() => navigate(`/round/${idx}/scorecard`)}>
+            Scorecard
+          </button>
           <button
             className="btn secondary small"
             onClick={() => navigate(`/round/${idx}/leaderboard`)}

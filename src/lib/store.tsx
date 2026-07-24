@@ -7,7 +7,17 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { PairingSplit, Player, Round, TripState } from '../types'
+import type {
+  GameType,
+  PairingSplit,
+  Player,
+  Round,
+  ScoringMode,
+  SkinsConfig,
+  TieMode,
+  TripState,
+  WolfCall,
+} from '../types'
 import { DEFAULT_PAIRINGS } from '../data/courses'
 import { supabase } from './supabaseClient'
 import { GAMES_TABLE, SYNC_CONFIGURED } from './syncConfig'
@@ -47,9 +57,14 @@ function freshRounds(): Round[] {
   return DEFAULT_PAIRINGS.map((pairing, index) => ({
     index,
     pairing,
+    game: 'stableford' as const,
+    scoring: 'net' as const,
+    tieMode: 'carry' as const,
+    skins: { points: true, putts: true, longest: true },
     gross: Array.from({ length: 18 }, () => ({})),
     putts: Array.from({ length: 18 }, () => ({})),
     longestPutt: Array.from({ length: 18 }, () => null),
+    wolf: Array.from({ length: 18 }, () => null),
     locked: false,
   }))
 }
@@ -82,6 +97,13 @@ function load(): TripState {
       if (!Array.isArray(r.longestPutt) || r.longestPutt.length !== 18) {
         r.longestPutt = Array.from({ length: 18 }, () => null)
       }
+      if (!Array.isArray(r.wolf) || r.wolf.length !== 18) {
+        r.wolf = Array.from({ length: 18 }, () => null)
+      }
+      if (!r.game) r.game = 'stableford'
+      if (!r.scoring) r.scoring = 'net'
+      if (!r.tieMode) r.tieMode = 'carry'
+      if (!r.skins) r.skins = { points: true, putts: true, longest: true }
     })
     if (!parsed.players || parsed.players.length !== 4) parsed.players = defaultPlayers()
     return parsed
@@ -96,7 +118,12 @@ interface Store {
   setScore: (roundIndex: number, hole: number, playerId: string, gross: number | null) => void
   setPutts: (roundIndex: number, hole: number, playerId: string, putts: number | null) => void
   setLongestPutt: (roundIndex: number, hole: number, playerId: string | null) => void
+  setWolfCall: (roundIndex: number, hole: number, call: WolfCall | null) => void
   setPairing: (roundIndex: number, pairing: PairingSplit) => void
+  setGame: (roundIndex: number, game: GameType) => void
+  setScoringMode: (roundIndex: number, scoring: ScoringMode) => void
+  setTieMode: (roundIndex: number, tieMode: TieMode) => void
+  setSkin: (roundIndex: number, skin: keyof SkinsConfig, on: boolean) => void
   setLocked: (roundIndex: number, locked: boolean) => void
   resetRound: (roundIndex: number) => void
   resetAll: () => void
@@ -275,12 +302,60 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const setWolfCall = useCallback(
+    (roundIndex: number, hole: number, call: WolfCall | null) => {
+      setState((s) => {
+        const rounds = s.rounds.map((r) => {
+          if (r.index !== roundIndex) return r
+          const arr = [...r.wolf]
+          arr[hole] = call
+          return { ...r, wolf: arr }
+        })
+        return { ...s, rounds }
+      })
+    },
+    [],
+  )
+
   const setPairing = useCallback((roundIndex: number, pairing: PairingSplit) => {
     setState((s) => ({
       ...s,
       rounds: s.rounds.map((r) => (r.index === roundIndex ? { ...r, pairing } : r)),
     }))
   }, [])
+
+  const setGame = useCallback((roundIndex: number, game: GameType) => {
+    setState((s) => ({
+      ...s,
+      rounds: s.rounds.map((r) => (r.index === roundIndex ? { ...r, game } : r)),
+    }))
+  }, [])
+
+  const setScoringMode = useCallback((roundIndex: number, scoring: ScoringMode) => {
+    setState((s) => ({
+      ...s,
+      rounds: s.rounds.map((r) => (r.index === roundIndex ? { ...r, scoring } : r)),
+    }))
+  }, [])
+
+  const setTieMode = useCallback((roundIndex: number, tieMode: TieMode) => {
+    setState((s) => ({
+      ...s,
+      rounds: s.rounds.map((r) => (r.index === roundIndex ? { ...r, tieMode } : r)),
+    }))
+  }, [])
+
+  const setSkin = useCallback(
+    (roundIndex: number, skin: keyof SkinsConfig, on: boolean) => {
+      setState((s) => ({
+        ...s,
+        rounds: s.rounds.map((r) =>
+          r.index === roundIndex ? { ...r, skins: { ...r.skins, [skin]: on } } : r,
+        ),
+      }))
+    },
+    [],
+  )
 
   const setLocked = useCallback((roundIndex: number, locked: boolean) => {
     setState((s) => ({
@@ -299,6 +374,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               gross: Array.from({ length: 18 }, () => ({})),
               putts: Array.from({ length: 18 }, () => ({})),
               longestPutt: Array.from({ length: 18 }, () => null),
+              wolf: Array.from({ length: 18 }, () => null),
               locked: false,
             }
           : r,
@@ -315,7 +391,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setScore,
       setPutts,
       setLongestPutt,
+      setWolfCall,
       setPairing,
+      setGame,
+      setScoringMode,
+      setTieMode,
+      setSkin,
       setLocked,
       resetRound,
       resetAll,
@@ -333,7 +414,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setScore,
       setPutts,
       setLongestPutt,
+      setWolfCall,
       setPairing,
+      setGame,
+      setScoringMode,
+      setTieMode,
+      setSkin,
       setLocked,
       resetRound,
       resetAll,

@@ -3,26 +3,48 @@ import TopBar from '../components/TopBar'
 import CoursePhoto from '../components/CoursePhoto'
 import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
-import { SPLIT_LABELS } from '../lib/scoring'
-import { quota, teamsForSplit } from '../lib/scoring'
-import type { PairingSplit } from '../types'
+import { SPLIT_LABELS, quota, teamsForSplit } from '../lib/scoring'
+import type { GameType, PairingSplit, ScoringMode, SkinsConfig, TieMode } from '../types'
+
+const GAMES: { id: GameType; label: string }[] = [
+  { id: 'stableford', label: 'Modified Stableford' },
+  { id: 'vegas', label: 'Vegas' },
+  { id: 'wolf', label: 'Wolf' },
+]
+
+const SKIN_LABELS: { key: keyof SkinsConfig; label: string }[] = [
+  { key: 'points', label: 'Points' },
+  { key: 'putts', label: 'Fewest Putts' },
+  { key: 'longest', label: 'Longest Putt' },
+]
 
 export default function RoundHome() {
   const { roundId } = useParams()
   const idx = Number(roundId)
   const navigate = useNavigate()
-  const { state, setPairing, resetRound, readOnly } = useStore()
+  const {
+    state,
+    setPairing,
+    setGame,
+    setScoringMode,
+    setTieMode,
+    setSkin,
+    resetRound,
+    readOnly,
+  } = useStore()
   const { players, rounds } = state
 
   const round = rounds.find((r) => r.index === idx)
   const course = COURSES[idx]
   if (!round || !course) return <Navigate to="/" replace />
 
+  const locked = round.locked || readOnly
   const entered = round.gross.filter((h) => Object.keys(h).length > 0).length
   const resumeHole = Math.min(entered + 1, 18)
 
   const [t0, t1] = teamsForSplit(round.pairing)
   const teamName = (pair: [number, number]) => `${players[pair[0]].name} + ${players[pair[1]].name}`
+  const gameLabel = GAMES.find((g) => g.id === round.game)?.label ?? round.game
 
   return (
     <>
@@ -35,33 +57,112 @@ export default function RoundHome() {
         <h1 className="big-head">{course.name}</h1>
         <p className="subhead">{course.day} &middot; Par {course.par.reduce((a, b) => a + b, 0)}</p>
 
-        <h2 className="section">Pairings (2 v 2)</h2>
-        {round.locked || readOnly ? (
-          <p className="muted">
-            {readOnly
-              ? 'Pairings are set by the scorekeeper.'
-              : 'Round is locked. Unlock in the summary to change pairings.'}
+        {/* ---- Game setup ---- */}
+        <h2 className="section">Game</h2>
+        {locked ? (
+          <p className="muted" style={{ marginTop: 0 }}>
+            {gameLabel} · {round.scoring === 'net' ? 'Net' : 'Gross'} scoring
           </p>
         ) : (
           <div className="segmented" style={{ marginBottom: 12 }}>
-            {SPLIT_LABELS.map((label, i) => (
+            {GAMES.map((g) => (
               <button
-                key={i}
-                className={round.pairing === i ? 'active' : ''}
-                onClick={() => setPairing(idx, i as PairingSplit)}
+                key={g.id}
+                className={round.game === g.id ? 'active' : ''}
+                onClick={() => setGame(idx, g.id)}
               >
-                {label}
+                {g.label}
               </button>
             ))}
           </div>
         )}
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div className="card-title">{teamName(t0)}</div>
-          <div className="vs">VS</div>
-          <div className="card-title">{teamName(t1)}</div>
-        </div>
 
-        <h2 className="section">Quotas This Round</h2>
+        {!locked && (
+          <>
+            <label style={{ marginTop: 4 }}>Scoring</label>
+            <div className="segmented" style={{ marginBottom: 12 }}>
+              {(['net', 'gross'] as ScoringMode[]).map((m) => (
+                <button
+                  key={m}
+                  className={round.scoring === m ? 'active' : ''}
+                  onClick={() => setScoringMode(idx, m)}
+                >
+                  {m === 'net' ? 'Net' : 'Gross'}
+                </button>
+              ))}
+            </div>
+
+            <label>Ties</label>
+            <div className="segmented" style={{ marginBottom: 12 }}>
+              {(['carry', 'wash'] as TieMode[]).map((m) => (
+                <button
+                  key={m}
+                  className={round.tieMode === m ? 'active' : ''}
+                  onClick={() => setTieMode(idx, m)}
+                >
+                  {m === 'carry' ? 'Carry + Stack' : 'Wash'}
+                </button>
+              ))}
+            </div>
+
+            <label>Skins (25¢ each) — tap to toggle</label>
+            <div className="segmented" style={{ marginBottom: 4 }}>
+              {SKIN_LABELS.map((s) => (
+                <button
+                  key={s.key}
+                  className={round.skins[s.key] ? 'active' : ''}
+                  onClick={() => setSkin(idx, s.key, !round.skins[s.key])}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ---- Pairings (Stableford & Vegas use these; Wolf rotates) ---- */}
+        {round.game === 'wolf' ? (
+          <>
+            <h2 className="section">Wolf Order</h2>
+            <div className="card">
+              <div className="muted" style={{ margin: 0 }}>
+                Wolf rotates each hole in this order:
+                <br />
+                <b style={{ color: 'var(--forest)' }}>
+                  {players.map((p) => p.name).join(' → ')} → repeat
+                </b>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 className="section">Pairings (2 v 2)</h2>
+            {locked ? (
+              <p className="muted">
+                {readOnly ? 'Pairings are set by the scorekeeper.' : 'Round is locked.'}
+              </p>
+            ) : (
+              <div className="segmented" style={{ marginBottom: 12 }}>
+                {SPLIT_LABELS.map((label, i) => (
+                  <button
+                    key={i}
+                    className={round.pairing === i ? 'active' : ''}
+                    onClick={() => setPairing(idx, i as PairingSplit)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="card" style={{ textAlign: 'center' }}>
+              <div className="card-title">{teamName(t0)}</div>
+              <div className="vs">VS</div>
+              <div className="card-title">{teamName(t1)}</div>
+            </div>
+          </>
+        )}
+
+        <h2 className="section">Players &amp; Quotas</h2>
         <div className="card" style={{ padding: 0 }}>
           <table>
             <thead>
@@ -104,7 +205,7 @@ export default function RoundHome() {
               onClick={() => {
                 if (
                   confirm(
-                    `Reset ${course.day} (${course.name})? This erases all scores, putts, and longest-putt picks for this round. This can't be undone.`,
+                    `Reset ${course.day} (${course.name})? This erases all scores, putts, longest-putt picks, and Wolf calls for this round. This can't be undone.`,
                   )
                 ) {
                   resetRound(idx)

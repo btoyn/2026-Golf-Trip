@@ -73,6 +73,45 @@ export default function Instructions() {
           </p>
         </div>
 
+        <h2 className="section">🎰 Vegas</h2>
+        <div className="card">
+          <p style={{ marginTop: 0 }}>
+            2v2. Each hole, combine your team's two scores into a two-digit number, <b>low score
+            first</b> (a 4 &amp; 5 = 45). Scores cap at 9.
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            The <b>difference</b> between the teams' numbers goes to the low team (56 − 45 = 11).
+            Running points, no money.
+          </p>
+        </div>
+
+        <h2 className="section">🐺 Wolf</h2>
+        <div className="card">
+          <p style={{ marginTop: 0 }}>
+            One player is the <b>Wolf</b> each hole, rotating in order. After the tee shots the Wolf
+            picks a <b>partner</b> (2v2) or goes solo.
+          </p>
+          <p>
+            <b>Lone Wolf</b> = 2× · <b>Blind Lone Wolf</b> (called before any tee shot) = 3×.
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            Teams compared by <b>combined score</b>; a Lone Wolf plays their one score vs the best of
+            the other three. Winners collect points from each opponent.
+          </p>
+        </div>
+
+        <h2 className="section">⚙️ Per-Round Options</h2>
+        <div className="card">
+          <p style={{ marginTop: 0 }}>
+            On each round's screen you pick the <b>game</b>, toggle <b>Net or Gross</b> scoring,
+            choose how <b>ties</b> are handled (wash or carry + stack), and turn each of the 3 skins
+            on or off. Skins can run alongside any game.
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            Tap <b>Scorecard</b> on the entry screen anytime to see everyone's gross scores.
+          </p>
+        </div>
+
         <h2 className="section">📲 Live Scoreboard</h2>
         <div className="card">
           <p style={{ marginTop: 0 }}>
