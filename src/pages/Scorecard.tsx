@@ -7,6 +7,23 @@ function sum(nums: (number | undefined)[]): number {
   return nums.reduce<number>((a, b) => a + (typeof b === 'number' ? b : 0), 0)
 }
 
+/** Traditional scorecard shape for a gross score vs par. */
+function markClass(gross: number, par: number): string {
+  const d = gross - par
+  if (d <= -2) return 'm-eagle' // double circle
+  if (d === -1) return 'm-birdie' // circle
+  if (d === 0) return '' // par — no shape
+  if (d === 1) return 'm-bogey' // square
+  if (d === 2) return 'm-double' // double square
+  return 'm-triple' // triple (or worse) square
+}
+
+function ScoreCell({ gross, par }: { gross: number | undefined; par: number }) {
+  if (typeof gross !== 'number') return null
+  const cls = markClass(gross, par)
+  return <span className={`mark ${cls}`}>{gross}</span>
+}
+
 export default function Scorecard() {
   const { roundId } = useParams()
   const idx = Number(roundId)
@@ -22,8 +39,6 @@ export default function Scorecard() {
 
   const parOut = sum(front.map((h) => course.par[h]))
   const parIn = sum(back.map((h) => course.par[h]))
-
-  const cell = (v: number | undefined) => (typeof v === 'number' ? v : '')
 
   return (
     <>
@@ -71,11 +86,15 @@ export default function Scorecard() {
                   <tr key={p.id}>
                     <td className="sc-name left">{p.name}</td>
                     {front.map((hh) => (
-                      <td key={hh}>{cell(g(hh))}</td>
+                      <td key={hh}>
+                        <ScoreCell gross={g(hh)} par={course.par[hh]} />
+                      </td>
                     ))}
                     <td className="sc-tot">{out || ''}</td>
                     {back.map((hh) => (
-                      <td key={hh}>{cell(g(hh))}</td>
+                      <td key={hh}>
+                        <ScoreCell gross={g(hh)} par={course.par[hh]} />
+                      </td>
                     ))}
                     <td className="sc-tot">{inn || ''}</td>
                     <td className="sc-tot">{out + inn || ''}</td>
@@ -85,7 +104,24 @@ export default function Scorecard() {
             </tbody>
           </table>
         </div>
-        <p className="muted center" style={{ marginTop: 12 }}>
+        <div className="sc-legend">
+          <span>
+            <span className="mark m-eagle">2</span> eagle+
+          </span>
+          <span>
+            <span className="mark m-birdie">3</span> birdie
+          </span>
+          <span>
+            <span className="mark m-bogey">5</span> bogey
+          </span>
+          <span>
+            <span className="mark m-double">6</span> double
+          </span>
+          <span>
+            <span className="mark m-triple">7</span> triple+
+          </span>
+        </div>
+        <p className="muted center" style={{ marginTop: 10 }}>
           Scroll sideways to see all 18 holes.
         </p>
       </div>
