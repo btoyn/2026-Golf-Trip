@@ -133,6 +133,10 @@ interface Store {
   syncCode: string
   syncRole: SyncRole
   syncStatus: SyncStatus
+  /** Last Supabase error message from a push/fetch, or null. */
+  syncError: string | null
+  /** True once a host has published or a guest has received data. */
+  syncOk: boolean
   setSync: (code: string, role: SyncRole) => void
   /** Guests (followers) view a read-only mirror of the scorekeeper's card. */
   readOnly: boolean
@@ -149,6 +153,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     typeof navigator === 'undefined' ? true : navigator.onLine,
   )
   const [subscribed, setSubscribed] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  /** Whether the host has successfully published, or the guest has received data. */
+  const [syncOk, setSyncOk] = useState(false)
 
   useEffect(() => {
     try {
@@ -187,7 +194,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sb.from(GAMES_TABLE)
         .upsert({ code: syncCode, state, updated_at: new Date().toISOString() })
         .then(({ error }) => {
-          if (error) console.warn('sync push failed:', error.message)
+          if (error) {
+            setSyncError(error.message)
+            setSyncOk(false)
+          } else {
+            setSyncError(null)
+            setSyncOk(true)
+          }
         })
     }, 500)
     return () => clearTimeout(t)
@@ -204,8 +217,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .select('state')
       .eq('code', syncCode)
       .maybeSingle()
-      .then(({ data }) => {
-        if (active && data?.state) setState(data.state as TripState)
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error) {
+          setSyncError(error.message)
+          setSyncOk(false)
+        } else if (data?.state) {
+          setSyncError(null)
+          setSyncOk(true)
+          setState(data.state as TripState)
+        } else {
+          // No row yet — the scorekeeper hasn't published under this code.
+          setSyncError(null)
+          setSyncOk(false)
+        }
       })
 
     const channel = sb
@@ -230,6 +255,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setSync = useCallback((code: string, role: SyncRole) => {
     const c = normalizeCode(code)
+    setSyncError(null)
+    setSyncOk(false)
     setSyncCode(role === 'off' ? '' : c)
     setSyncRole(role === 'off' || !c ? 'off' : role)
   }, [])
@@ -405,6 +432,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       syncCode,
       syncRole,
       syncStatus,
+      syncError,
+      syncOk,
       setSync,
       readOnly: syncRole === 'guest',
     }),
@@ -426,6 +455,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       syncCode,
       syncRole,
       syncStatus,
+      syncError,
+      syncOk,
       setSync,
     ],
   )

@@ -10,7 +10,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function Sync() {
-  const { syncConfigured, syncCode, syncRole, syncStatus, setSync } = useStore()
+  const { syncConfigured, syncCode, syncRole, syncStatus, syncError, syncOk, setSync } = useStore()
   const [code, setCode] = useState(syncCode || 'sweaty-balls-2026')
 
   const apply = (role: 'host' | 'guest') => {
@@ -45,7 +45,35 @@ export default function Sync() {
                   code <b>{syncCode}</b>
                 </div>
               )}
+              {syncRole !== 'off' && (
+                <div className="muted" style={{ marginTop: 6, fontWeight: 700 }}>
+                  {syncError
+                    ? '⚠️ connection error (see below)'
+                    : syncOk
+                      ? syncRole === 'host'
+                        ? '✅ scores published to the cloud'
+                        : '✅ received the scorekeeper’s card'
+                      : syncRole === 'guest'
+                        ? '… no card found for this code yet'
+                        : '… waiting to publish'}
+                </div>
+              )}
             </div>
+
+            {syncError && (
+              <div className="card" style={{ borderColor: 'var(--rust)' }}>
+                <div className="card-title" style={{ color: 'var(--rust)', marginBottom: 6 }}>
+                  Sync error
+                </div>
+                <p className="muted" style={{ margin: 0, wordBreak: 'break-word' }}>
+                  {syncError}
+                </p>
+                <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>
+                  If this mentions the <b>games</b> table not existing or permissions, the one-time
+                  Supabase setup needs to be finished.
+                </p>
+              </div>
+            )}
 
             <h2 className="section">Trip Code</h2>
             <p className="muted" style={{ marginTop: 0 }}>
