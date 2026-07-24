@@ -31,6 +31,9 @@ export type ScoringMode = 'net' | 'gross'
 /** How a tie on a hole is handled where applicable. */
 export type TieMode = 'wash' | 'carry'
 
+/** Team competition format for Stableford & Vegas. */
+export type PlayFormat = 'stroke' | 'match'
+
 /** Which of the three skins games are running this round. */
 export interface SkinsConfig {
   points: boolean
@@ -55,6 +58,8 @@ export interface Round {
   game: GameType
   /** Net or gross scoring for the round (applies to all active games). */
   scoring: ScoringMode
+  /** Stroke (cumulative) or match (hole-by-hole) for Stableford & Vegas. */
+  format: PlayFormat
   /** Tie handling for the round (wash or carry+stack). */
   tieMode: TieMode
   /** Which skins games are on this round. */

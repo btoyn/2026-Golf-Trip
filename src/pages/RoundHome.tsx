@@ -4,7 +4,7 @@ import CoursePhoto from '../components/CoursePhoto'
 import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
 import { SPLIT_LABELS, quota, teamsForSplit } from '../lib/scoring'
-import type { GameType, PairingSplit, ScoringMode, SkinsConfig, TieMode } from '../types'
+import type { GameType, PairingSplit, PlayFormat, ScoringMode, SkinsConfig, TieMode } from '../types'
 
 const GAMES: { id: GameType; label: string }[] = [
   { id: 'stableford', label: 'Modified Stableford' },
@@ -27,6 +27,7 @@ export default function RoundHome() {
     setPairing,
     setGame,
     setScoringMode,
+    setFormat,
     setTieMode,
     setSkin,
     resetRound,
@@ -61,7 +62,8 @@ export default function RoundHome() {
         <h2 className="section">Game</h2>
         {locked ? (
           <p className="muted" style={{ marginTop: 0 }}>
-            {gameLabel} · {round.scoring === 'net' ? 'Net' : 'Gross'} scoring
+            {gameLabel} · {round.scoring === 'net' ? 'Net' : 'Gross'}
+            {round.game !== 'wolf' && ` · ${round.format === 'match' ? 'Match Play' : 'Stroke Play'}`}
           </p>
         ) : (
           <div className="segmented" style={{ marginBottom: 12 }}>
@@ -91,6 +93,23 @@ export default function RoundHome() {
                 </button>
               ))}
             </div>
+
+            {round.game !== 'wolf' && (
+              <>
+                <label>Format</label>
+                <div className="segmented" style={{ marginBottom: 12 }}>
+                  {(['stroke', 'match'] as PlayFormat[]).map((m) => (
+                    <button
+                      key={m}
+                      className={round.format === m ? 'active' : ''}
+                      onClick={() => setFormat(idx, m)}
+                    >
+                      {m === 'stroke' ? 'Stroke Play' : 'Match Play'}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             <label>Ties</label>
             <div className="segmented" style={{ marginBottom: 12 }}>

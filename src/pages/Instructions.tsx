@@ -103,9 +103,13 @@ export default function Instructions() {
         <h2 className="section">⚙️ Per-Round Options</h2>
         <div className="card">
           <p style={{ marginTop: 0 }}>
-            On each round's screen you pick the <b>game</b>, toggle <b>Net or Gross</b> scoring,
-            choose how <b>ties</b> are handled (wash or carry + stack), and turn each of the 3 skins
-            on or off. Skins can run alongside any game.
+            On each round's screen you pick the <b>game</b>, toggle <b>Net or Gross</b> scoring, and
+            (for Stableford &amp; Vegas) <b>Stroke or Match play</b>, choose how <b>ties</b> are
+            handled (wash or carry + stack), and turn each of the 3 skins on or off.
+          </p>
+          <p>
+            <b>Stroke play</b> adds everything up over 18 (best total wins). <b>Match play</b> is
+            hole-by-hole — win/halve/lose each hole, scored as holes "up" (e.g. "3 &amp; 2").
           </p>
           <p style={{ marginBottom: 0 }}>
             Tap <b>Scorecard</b> on the entry screen anytime to see everyone's gross scores.

@@ -386,6 +386,102 @@ export function computeVegas(players: Player[], round: Round, course: Course): V
 }
 
 // ---------------------------------------------------------------------------
+// Match play (Stableford & Vegas)
+// ---------------------------------------------------------------------------
+
+export interface MatchPlayResult {
+  teams: [[string, string], [string, string]]
+  /** Per hole: 0/1 winning team, null halve, undefined not complete. */
+  holeWinners: (number | null | undefined)[]
+  /** Signed holes: positive = team0 up. */
+  up: number
+  leader: number | null
+  holesPlayed: number
+  remaining: number
+  /** True once the match is mathematically clinched or 18 are done with a leader. */
+  decided: boolean
+  /** Human status, e.g. "3 & 2", "Dormie 2", "2 UP", "All Square". */
+  status: string
+}
+
+/**
+ * Hole-by-hole team match for Stableford or Vegas. Each hole is won by the
+ * team with more combined quota points (Stableford) or the lower Vegas number
+ * (Vegas); equal halves the hole.
+ */
+export function computeMatchPlay(players: Player[], round: Round, course: Course): MatchPlayResult {
+  const [t0, t1] = teamsForSplit(round.pairing)
+  const teams: [[string, string], [string, string]] = [
+    [players[t0[0]].id, players[t0[1]].id],
+    [players[t1[0]].id, players[t1[1]].id],
+  ]
+  const holeWinners: (number | null | undefined)[] = []
+  let up = 0
+  let played = 0
+
+  const vegasNum = (idx: [number, number], h: number, e: Record<string, number>) => {
+    const a = players[idx[0]]
+    const b = players[idx[1]]
+    const sa = Math.min(9, effectiveScore(e[a.id], a.handicap, course.si[h], round.scoring))
+    const sb = Math.min(9, effectiveScore(e[b.id], b.handicap, course.si[h], round.scoring))
+    return Math.min(sa, sb) * 10 + Math.max(sa, sb)
+  }
+  const stablePts = (idx: [number, number], h: number, e: Record<string, number>) => {
+    const a = players[idx[0]]
+    const b = players[idx[1]]
+    return (
+      holePoints(e[a.id], a.handicap, course.par[h], course.si[h], round.scoring) +
+      holePoints(e[b.id], b.handicap, course.par[h], course.si[h], round.scoring)
+    )
+  }
+
+  for (let h = 0; h < 18; h++) {
+    const e = round.gross[h] ?? {}
+    const need = [...t0, ...t1].map((i) => players[i].id)
+    if (!need.every((id) => typeof e[id] === 'number')) {
+      holeWinners.push(undefined)
+      continue
+    }
+    played++
+    let w: number | null
+    if (round.game === 'vegas') {
+      const n0 = vegasNum(t0, h, e)
+      const n1 = vegasNum(t1, h, e)
+      w = n0 < n1 ? 0 : n1 < n0 ? 1 : null
+    } else {
+      const p0 = stablePts(t0, h, e)
+      const p1 = stablePts(t1, h, e)
+      w = p0 > p1 ? 0 : p1 > p0 ? 1 : null
+    }
+    holeWinners.push(w)
+    if (w === 0) up++
+    else if (w === 1) up--
+  }
+
+  const remaining = 18 - played
+  const lead = Math.abs(up)
+  const leader = up > 0 ? 0 : up < 0 ? 1 : null
+
+  let status: string
+  let decided = false
+  if (leader === null) {
+    status = 'All Square'
+  } else if (remaining === 0) {
+    status = `${lead} UP`
+    decided = true
+  } else if (lead > remaining) {
+    status = `${lead} & ${remaining}`
+    decided = true
+  } else if (lead === remaining) {
+    status = `Dormie ${lead}`
+  } else {
+    status = `${lead} UP`
+  }
+
+  return { teams, holeWinners, up, leader, holesPlayed: played, remaining, decided, status }
+}
+
+// ---------------------------------------------------------------------------
 // Wolf
 // ---------------------------------------------------------------------------
 

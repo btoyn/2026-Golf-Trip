@@ -734,6 +734,15 @@ tr:last-child td {
   font-size: 13px;
 }
 
+.match-status {
+  text-align: center;
+  margin: 2px 0 4px;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--forest);
+}
+
 .footer-note {
   font-size: 11px;
   color: #8a8a6c;

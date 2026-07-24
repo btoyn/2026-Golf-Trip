@@ -3,6 +3,7 @@ import type { Course, Player, Round } from '../types'
 import {
   computeAllSkins,
   computeLongestPuttSkins,
+  computeMatchPlay,
   computePointsSkins,
   computePuttsSkins,
   computeVegas,
@@ -69,6 +70,7 @@ function emptyRound(): Round {
     pairing: 0,
     game: 'stableford',
     scoring: 'net',
+    format: 'stroke',
     tieMode: 'carry',
     skins: { points: true, putts: true, longest: true },
     gross: Array.from({ length: 18 }, () => ({})),
@@ -219,6 +221,43 @@ rblind.gross[0] = { a: 6, b: 3, c: 4, d: 5 }
 wres = computeWolf(players, rblind, course)
 eq(wres.points['a'], -9, 'blind lone loss: A -9')
 eq(wres.points['b'], 3, 'blind lone loss: B +3')
+
+// ---- Match play (Stableford) ----
+// split 0 => A+B vs C+D. Give team0 more points on holes 1-3, tie hole 4.
+const rm = emptyRound()
+rm.game = 'stableford'
+rm.pairing = 0
+rm.gross[0] = { a: 3, b: 3, c: 4, d: 4 } // team0 pts 6 vs 4 -> team0 wins
+rm.gross[1] = { a: 3, b: 4, c: 4, d: 4 } // team0 5 vs 4 -> team0
+rm.gross[2] = { a: 3, b: 4, c: 4, d: 4 } // team0 wins
+rm.gross[3] = { a: 4, b: 4, c: 4, d: 4 } // all par -> halve
+const mp = computeMatchPlay(players, rm, course)
+eq(mp.up, 3, 'match: team0 3 up')
+eq(mp.leader, 0, 'match: leader team0')
+eq(mp.holesPlayed, 4, 'match: 4 holes played')
+eq(mp.status, '3 UP', 'match: 3 UP thru 4')
+
+// Closed out: team0 up 3 with only 2 to play -> "3 & 2"
+const rm2 = emptyRound()
+rm2.game = 'stableford'
+rm2.pairing = 0
+for (let hh = 0; hh < 16; hh++) rm2.gross[hh] = { a: 4, b: 4, c: 4, d: 4 } // 16 halves
+rm2.gross[13] = { a: 3, b: 4, c: 4, d: 4 }
+rm2.gross[14] = { a: 3, b: 4, c: 4, d: 4 }
+rm2.gross[15] = { a: 3, b: 4, c: 4, d: 4 } // team0 wins 14,15,16 -> 3 up, 2 to play
+const mp2 = computeMatchPlay(players, rm2, course)
+eq(mp2.up, 3, 'match2: team0 3 up')
+eq(mp2.status, '3 & 2', 'match2: closed out 3 & 2')
+eq(mp2.decided, true, 'match2: decided')
+
+// Vegas match play: lower number wins the hole
+const rmv = emptyRound()
+rmv.game = 'vegas'
+rmv.pairing = 0
+rmv.gross[0] = { a: 4, b: 5, c: 5, d: 6 } // team0 45 vs team1 56 -> team0 wins hole
+const mpv = computeMatchPlay(players, rmv, course)
+eq(mpv.up, 1, 'vegas match: team0 1 up')
+eq(mpv.status, '1 UP', 'vegas match: 1 UP')
 
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`)

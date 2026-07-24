@@ -1,5 +1,6 @@
 import { useNavigate, useParams, Navigate } from 'react-router-dom'
 import TopBar from '../components/TopBar'
+import MatchView from '../components/MatchView'
 import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
 import {
@@ -173,32 +174,38 @@ function StablefordResult({ players, round, course, name }: SectionProps) {
   const match = teamMatch(players, round, course)
   return (
     <>
-      <h2 className="section">Team Match Result</h2>
-      {match.teams.map((t, i) => (
-        <div className={`team-box ${match.winner === i ? 'winner' : ''}`} key={i}>
-          <div className="names">
-            <span>
-              {name(t.playerIds[0])} + {name(t.playerIds[1])}
-            </span>
-            {match.winner === i && <span className="chip">Winner</span>}
-          </div>
-          <div className="stats">
-            <div>
-              <span className="muted">Points</span>
-              <b>{t.points}</b>
+      <h2 className="section">Team {round.format === 'match' ? 'Match Play' : 'Match'} Result</h2>
+      {round.format === 'match' ? (
+        <MatchView players={players} round={round} course={course} name={name} final />
+      ) : (
+        <>
+          {match.teams.map((t, i) => (
+            <div className={`team-box ${match.winner === i ? 'winner' : ''}`} key={i}>
+              <div className="names">
+                <span>
+                  {name(t.playerIds[0])} + {name(t.playerIds[1])}
+                </span>
+                {match.winner === i && <span className="chip">Winner</span>}
+              </div>
+              <div className="stats">
+                <div>
+                  <span className="muted">Points</span>
+                  <b>{t.points}</b>
+                </div>
+                <div>
+                  <span className="muted">Quota</span>
+                  <b>{t.quota}</b>
+                </div>
+                <div>
+                  <span className="muted">Margin</span>
+                  <b>{signed(t.margin)}</b>
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="muted">Quota</span>
-              <b>{t.quota}</b>
-            </div>
-            <div>
-              <span className="muted">Margin</span>
-              <b>{signed(t.margin)}</b>
-            </div>
-          </div>
-        </div>
-      ))}
-      {match.winner === null && <p className="muted center">Match tied on margin.</p>}
+          ))}
+          {match.winner === null && <p className="muted center">Match tied on margin.</p>}
+        </>
+      )}
       <h2 className="section">Individual Quota</h2>
       <div className="card" style={{ padding: 0 }}>
         <table>
@@ -231,6 +238,14 @@ function StablefordResult({ players, round, course, name }: SectionProps) {
 function VegasResult({ players, round, course, name }: SectionProps) {
   const v = computeVegas(players, round, course)
   const winner = v.points[0] === v.points[1] ? null : v.points[0] > v.points[1] ? 0 : 1
+  if (round.format === 'match') {
+    return (
+      <>
+        <h2 className="section">Vegas — Match Play Result</h2>
+        <MatchView players={players} round={round} course={course} name={name} final />
+      </>
+    )
+  }
   return (
     <>
       <h2 className="section">Vegas Result</h2>

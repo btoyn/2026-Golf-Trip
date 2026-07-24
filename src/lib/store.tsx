@@ -10,6 +10,7 @@ import {
 import type {
   GameType,
   PairingSplit,
+  PlayFormat,
   Player,
   Round,
   ScoringMode,
@@ -59,6 +60,7 @@ function freshRounds(): Round[] {
     pairing,
     game: 'stableford' as const,
     scoring: 'net' as const,
+    format: 'stroke' as const,
     tieMode: 'carry' as const,
     skins: { points: true, putts: true, longest: true },
     gross: Array.from({ length: 18 }, () => ({})),
@@ -102,6 +104,7 @@ function load(): TripState {
       }
       if (!r.game) r.game = 'stableford'
       if (!r.scoring) r.scoring = 'net'
+      if (!r.format) r.format = 'stroke'
       if (!r.tieMode) r.tieMode = 'carry'
       if (!r.skins) r.skins = { points: true, putts: true, longest: true }
     })
@@ -122,6 +125,7 @@ interface Store {
   setPairing: (roundIndex: number, pairing: PairingSplit) => void
   setGame: (roundIndex: number, game: GameType) => void
   setScoringMode: (roundIndex: number, scoring: ScoringMode) => void
+  setFormat: (roundIndex: number, format: PlayFormat) => void
   setTieMode: (roundIndex: number, tieMode: TieMode) => void
   setSkin: (roundIndex: number, skin: keyof SkinsConfig, on: boolean) => void
   setLocked: (roundIndex: number, locked: boolean) => void
@@ -365,6 +369,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const setFormat = useCallback((roundIndex: number, format: PlayFormat) => {
+    setState((s) => ({
+      ...s,
+      rounds: s.rounds.map((r) => (r.index === roundIndex ? { ...r, format } : r)),
+    }))
+  }, [])
+
   const setTieMode = useCallback((roundIndex: number, tieMode: TieMode) => {
     setState((s) => ({
       ...s,
@@ -422,6 +433,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setPairing,
       setGame,
       setScoringMode,
+      setFormat,
       setTieMode,
       setSkin,
       setLocked,
@@ -447,6 +459,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setPairing,
       setGame,
       setScoringMode,
+      setFormat,
       setTieMode,
       setSkin,
       setLocked,
