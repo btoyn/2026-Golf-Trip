@@ -141,6 +141,13 @@ export default function RoundSummary() {
           )
         )}
 
+        <button
+          className="btn secondary"
+          style={{ marginTop: 12 }}
+          onClick={() => navigate(`/round/${idx}/compare`)}
+        >
+          🔀 What If — Compare Games
+        </button>
         <div className="btn-row">
           <button className="btn secondary small" onClick={() => navigate(`/round/${idx}/scorecard`)}>
             Scorecard

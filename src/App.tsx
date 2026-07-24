@@ -8,6 +8,7 @@ import HoleEntry from './pages/HoleEntry'
 import Scorecard from './pages/Scorecard'
 import LiveLeaderboard from './pages/LiveLeaderboard'
 import RoundSummary from './pages/RoundSummary'
+import Compare from './pages/Compare'
 import TripLeaderboard from './pages/TripLeaderboard'
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/round/:roundId/scorecard" element={<Scorecard />} />
         <Route path="/round/:roundId/leaderboard" element={<LiveLeaderboard />} />
         <Route path="/round/:roundId/summary" element={<RoundSummary />} />
+        <Route path="/round/:roundId/compare" element={<Compare />} />
         <Route path="/leaderboard" element={<TripLeaderboard />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
