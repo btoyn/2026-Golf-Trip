@@ -37,6 +37,8 @@ export default function TripLeaderboard() {
   const vegasPts = zero()
   const wolfPts = zero()
   const skinsTotal = zero()
+  const grossTotal = zero()
+  const grossThru = zero()
   const wlt = Object.fromEntries(
     players.map((p) => [p.id, { w: 0, l: 0, t: 0 }]),
   ) as Record<string, { w: number; l: number; t: number }>
@@ -54,6 +56,16 @@ export default function TripLeaderboard() {
     players.forEach((p) => {
       skinsTotal[p.id] += skins.total[p.id] ?? 0
       totalSkins += skins.total[p.id] ?? 0
+    })
+
+    round.gross.forEach((hole) => {
+      players.forEach((p) => {
+        const g = hole[p.id]
+        if (typeof g === 'number') {
+          grossTotal[p.id] += g
+          grossThru[p.id] += 1
+        }
+      })
     })
 
     if (round.game === 'stableford') {
@@ -185,6 +197,41 @@ export default function TripLeaderboard() {
             </div>
           </>
         )}
+
+        <h2 className="section">Trip Gross — Total Strokes</h2>
+        <div className="card" style={{ padding: 0 }}>
+          <table>
+            <thead>
+              <tr>
+                <th className="left">#</th>
+                <th className="left">Player</th>
+                <th>Thru</th>
+                <th>Strokes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...players]
+                .sort(
+                  (a, b) =>
+                    (grossThru[a.id] ? grossTotal[a.id] : Infinity) -
+                    (grossThru[b.id] ? grossTotal[b.id] : Infinity),
+                )
+                .map((p, i) => (
+                  <tr key={p.id}>
+                    <td className="left pos">{grossThru[p.id] ? i + 1 : '–'}</td>
+                    <td className="left">{p.name}</td>
+                    <td>{grossThru[p.id]}</td>
+                    <td>
+                      <b>{grossThru[p.id] ? grossTotal[p.id] : '–'}</b>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="muted" style={{ marginTop: 6 }}>
+          Total gross strokes across all rounds. "Thru" is how many holes each player has posted.
+        </p>
 
         <h2 className="section">Skins — Trip Total</h2>
         <div className="card" style={{ padding: 0 }}>

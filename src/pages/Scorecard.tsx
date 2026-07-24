@@ -104,24 +104,7 @@ export default function Scorecard() {
             </tbody>
           </table>
         </div>
-        <div className="sc-legend">
-          <span>
-            <span className="mark m-eagle">2</span> eagle+
-          </span>
-          <span>
-            <span className="mark m-birdie">3</span> birdie
-          </span>
-          <span>
-            <span className="mark m-bogey">5</span> bogey
-          </span>
-          <span>
-            <span className="mark m-double">6</span> double
-          </span>
-          <span>
-            <span className="mark m-triple">7</span> triple+
-          </span>
-        </div>
-        <p className="muted center" style={{ marginTop: 10 }}>
+        <p className="muted center" style={{ marginTop: 12 }}>
           Scroll sideways to see all 18 holes.
         </p>
       </div>
