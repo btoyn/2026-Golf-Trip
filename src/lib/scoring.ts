@@ -386,6 +386,66 @@ export function computeVegas(players: Player[], round: Round, course: Course): V
 }
 
 // ---------------------------------------------------------------------------
+// Team Stroke (aggregate)
+// ---------------------------------------------------------------------------
+
+export interface TeamStrokeLine {
+  playerIds: [string, string]
+  /** Combined strokes over holes both partners have posted. */
+  total: number
+  /** Holes where both partners have a score. */
+  thru: number
+  /** Combined strokes relative to (2 x par) over those holes. */
+  toPar: number
+}
+
+export interface TeamStrokeResult {
+  teams: [TeamStrokeLine, TeamStrokeLine]
+  /** 0/1 lower-to-par team, or null if tied / not started. */
+  leader: number | null
+}
+
+/**
+ * Team stroke play: add both partners' scores every hole; lowest team total
+ * wins. Ranking uses combined strokes-to-par so partial rounds compare fairly.
+ */
+export function computeTeamStroke(players: Player[], round: Round, course: Course): TeamStrokeResult {
+  const [t0, t1] = teamsForSplit(round.pairing)
+
+  const build = (idx: [number, number]): TeamStrokeLine => {
+    const a = players[idx[0]]
+    const b = players[idx[1]]
+    let total = 0
+    let thru = 0
+    let parSum = 0
+    for (let h = 0; h < 18; h++) {
+      const ga = round.gross[h]?.[a.id]
+      const gb = round.gross[h]?.[b.id]
+      if (typeof ga === 'number' && typeof gb === 'number') {
+        total +=
+          effectiveScore(ga, a.handicap, course.si[h], round.scoring) +
+          effectiveScore(gb, b.handicap, course.si[h], round.scoring)
+        parSum += course.par[h] * 2
+        thru++
+      }
+    }
+    return { playerIds: [a.id, b.id], total, thru, toPar: total - parSum }
+  }
+
+  const team0 = build(t0)
+  const team1 = build(t1)
+
+  let leader: number | null = null
+  if (team0.thru > 0 && team1.thru > 0) {
+    if (team0.toPar < team1.toPar) leader = 0
+    else if (team1.toPar < team0.toPar) leader = 1
+  } else if (team0.thru > 0) leader = 0
+  else if (team1.thru > 0) leader = 1
+
+  return { teams: [team0, team1], leader }
+}
+
+// ---------------------------------------------------------------------------
 // Match play (Stableford & Vegas)
 // ---------------------------------------------------------------------------
 

@@ -4,6 +4,7 @@ import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
 import {
   computeAllSkins,
+  computeTeamStroke,
   computeVegas,
   computeWolf,
   effectiveScore,
@@ -41,6 +42,8 @@ export default function HoleEntry() {
   const skins = computeAllSkins(players, round, course)
   const vegas = round.game === 'vegas' ? computeVegas(players, round, course) : null
   const wolf = round.game === 'wolf' ? computeWolf(players, round, course) : null
+  const teamStroke = round.game === 'teamstroke' ? computeTeamStroke(players, round, course) : null
+  const hcpOf = (id: string) => players.find((p) => p.id === id)?.handicap ?? 0
   const wolfId = wolfForHole(players, h)
   const wolfCall = round.wolf[h]
 
@@ -291,6 +294,41 @@ export default function HoleEntry() {
                   .join(' · ')}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Team stroke result */}
+        {teamStroke && (
+          <div className="game-result">
+            {teamStroke.teams.map((line, i) => {
+              const [ia, ib] = line.playerIds
+              const ga = grossEntries[ia]
+              const gb = grossEntries[ib]
+              const holeComb =
+                typeof ga === 'number' && typeof gb === 'number'
+                  ? effectiveScore(ga, hcpOf(ia), si, mode) + effectiveScore(gb, hcpOf(ib), si, mode)
+                  : null
+              return (
+                <div className="gr-row" key={i}>
+                  <span>
+                    {name(ia)} + {name(ib)}
+                  </span>
+                  <b>
+                    {holeComb ?? '–'}{' '}
+                    <span className="muted" style={{ fontWeight: 600 }}>
+                      · {line.total} tot
+                    </span>
+                  </b>
+                </div>
+              )
+            })}
+            <div className="gr-foot">
+              {teamStroke.leader === null
+                ? 'All even'
+                : `${name(teamStroke.teams[teamStroke.leader].playerIds[0])} + ${name(
+                    teamStroke.teams[teamStroke.leader].playerIds[1],
+                  )} lead`}
+            </div>
           </div>
         )}
 

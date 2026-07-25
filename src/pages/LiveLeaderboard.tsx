@@ -5,6 +5,7 @@ import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
 import {
   computeAllSkins,
+  computeTeamStroke,
   computeVegas,
   computeWolf,
   playerRoundLines,
@@ -50,6 +51,7 @@ export default function LiveLeaderboard() {
         {round.game === 'stableford' && <Stableford {...{ players, round, course, name }} />}
         {round.game === 'vegas' && <Vegas {...{ players, round, course, name }} />}
         {round.game === 'wolf' && <Wolf {...{ players, round, course, name }} />}
+        {round.game === 'teamstroke' && <TeamStroke {...{ players, round, course, name }} />}
 
         {skins.any && (
           <>
@@ -229,6 +231,45 @@ function Vegas({ players, round, course, name }: SectionProps) {
         </div>
       ))}
       {lead === null && <p className="muted center">Teams are level.</p>}
+    </>
+  )
+}
+
+function toPar(n: number) {
+  if (n === 0) return 'E'
+  return n > 0 ? `+${n}` : `${n}`
+}
+
+function TeamStroke({ players, round, course, name }: SectionProps) {
+  const t = computeTeamStroke(players, round, course)
+  return (
+    <>
+      <h2 className="section">Team Stroke — Combined</h2>
+      {t.teams.map((line, i) => (
+        <div className={`team-box ${t.leader === i ? 'winner' : ''}`} key={i}>
+          <div className="names">
+            <span>
+              {name(line.playerIds[0])} + {name(line.playerIds[1])}
+            </span>
+            {t.leader === i && <span className="chip">Leading</span>}
+          </div>
+          <div className="stats">
+            <div>
+              <span className="muted">Strokes</span>
+              <b>{line.total}</b>
+            </div>
+            <div>
+              <span className="muted">To Par</span>
+              <b>{toPar(line.toPar)}</b>
+            </div>
+            <div>
+              <span className="muted">Thru</span>
+              <b>{line.thru}</b>
+            </div>
+          </div>
+        </div>
+      ))}
+      {t.leader === null && <p className="muted center">All even.</p>}
     </>
   )
 }

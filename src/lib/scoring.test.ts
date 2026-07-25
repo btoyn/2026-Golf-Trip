@@ -4,6 +4,7 @@ import {
   computeAllSkins,
   computeLongestPuttSkins,
   computeMatchPlay,
+  computeTeamStroke,
   computePointsSkins,
   computePuttsSkins,
   computeVegas,
@@ -258,6 +259,25 @@ rmv.gross[0] = { a: 4, b: 5, c: 5, d: 6 } // team0 45 vs team1 56 -> team0 wins 
 const mpv = computeMatchPlay(players, rmv, course)
 eq(mpv.up, 1, 'vegas match: team0 1 up')
 eq(mpv.status, '1 UP', 'vegas match: 1 UP')
+
+// ---- Team stroke (aggregate, gross) ----
+// split 2 => A+D vs B+C (Brandon+Nate vs Chase+Vance). Gross.
+const rts = emptyRound()
+rts.game = 'teamstroke'
+rts.scoring = 'gross'
+rts.pairing = 2
+// hole1 par4: A4 D5 = 9 ; B5 C6 = 11 -> teamAD leads
+rts.gross[0] = { a: 4, b: 5, c: 6, d: 5 }
+// hole2 par5: A5 D5 = 10 ; B4 C5 = 9 -> teamBC better this hole
+rts.gross[1] = { a: 5, b: 4, c: 5, d: 5 }
+const ts = computeTeamStroke(players, rts, course)
+// team0 = A+D = 9+10 = 19 ; team1 = B+C = 11+9 = 20
+eq(ts.teams[0].total, 19, 'teamstroke: A+D total 19')
+eq(ts.teams[1].total, 20, 'teamstroke: B+C total 20')
+eq(ts.teams[0].thru, 2, 'teamstroke: thru 2')
+eq(ts.leader, 0, 'teamstroke: A+D leads (lower total)')
+// test course is all par 4: 2 holes => 8 *2 = 16 ; A+D toPar = 19-16 = +3
+eq(ts.teams[0].toPar, 3, 'teamstroke: A+D +3 to par')
 
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`)

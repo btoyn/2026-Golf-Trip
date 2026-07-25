@@ -23,7 +23,12 @@ function signed(n: number) {
   return <span className={cls}>{n > 0 ? `+${n}` : n}</span>
 }
 
-const GAME_SHORT: Record<string, string> = { stableford: 'Stableford', vegas: 'Vegas', wolf: 'Wolf' }
+const GAME_SHORT: Record<string, string> = {
+  stableford: 'Stableford',
+  vegas: 'Vegas',
+  wolf: 'Wolf',
+  teamstroke: 'Team Stroke',
+}
 
 export default function TripLeaderboard() {
   const { state } = useStore()

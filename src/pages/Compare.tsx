@@ -3,6 +3,7 @@ import TopBar from '../components/TopBar'
 import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
 import {
+  computeTeamStroke,
   computeVegas,
   computeWolf,
   playerRoundLines,
@@ -43,6 +44,7 @@ export default function Compare() {
   const lines = playerRoundLines(players, round, course)
   const match = teamMatch(players, round, course)
   const vegas = computeVegas(players, round, course)
+  const ts = computeTeamStroke(players, round, course)
   const wolfPlayed = round.wolf.some((w) => w !== null)
   const wolf = wolfPlayed ? computeWolf(players, round, course) : null
 
@@ -116,6 +118,29 @@ export default function Compare() {
           </div>
         ))}
         {vegasLead === null && <p className="muted center">Vegas would be tied.</p>}
+
+        {/* Team Stroke */}
+        <h2 className="section">Team Stroke {tag('teamstroke')}</h2>
+        {ts.teams.map((line, i) => (
+          <div className={`team-box ${ts.leader === i ? 'winner' : ''}`} key={i}>
+            <div className="names">
+              <span>
+                {name(line.playerIds[0])} + {name(line.playerIds[1])}
+              </span>
+              {ts.leader === i && <span className="chip">Wins</span>}
+            </div>
+            <div className="stats">
+              <div>
+                <span className="muted">Strokes</span>
+                <b>{line.total}</b>
+              </div>
+              <div>
+                <span className="muted">To Par</span>
+                <b>{ts.teams[i].toPar > 0 ? `+${ts.teams[i].toPar}` : ts.teams[i].toPar || 'E'}</b>
+              </div>
+            </div>
+          </div>
+        ))}
 
         {/* Wolf */}
         <h2 className="section">Wolf {tag('wolf')}</h2>

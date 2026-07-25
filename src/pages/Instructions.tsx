@@ -85,6 +85,14 @@ export default function Instructions() {
           </p>
         </div>
 
+        <h2 className="section">🧮 Team Stroke</h2>
+        <div className="card">
+          <p style={{ margin: 0 }}>
+            2v2. Add <b>both partners' strokes</b> on every hole; lowest combined team total over 18
+            wins. Pure stroke play (usually played gross).
+          </p>
+        </div>
+
         <h2 className="section">🐺 Wolf</h2>
         <div className="card">
           <p style={{ marginTop: 0 }}>

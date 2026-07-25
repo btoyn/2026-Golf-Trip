@@ -10,7 +10,11 @@ const GAMES: { id: GameType; label: string }[] = [
   { id: 'stableford', label: 'Modified Stableford' },
   { id: 'vegas', label: 'Vegas' },
   { id: 'wolf', label: 'Wolf' },
+  { id: 'teamstroke', label: 'Team Stroke' },
 ]
+
+/** Games whose team competition supports the stroke/match format toggle. */
+const FORMAT_GAMES: GameType[] = ['stableford', 'vegas']
 
 const SKIN_LABELS: { key: keyof SkinsConfig; label: string }[] = [
   { key: 'points', label: 'Points' },
@@ -63,7 +67,8 @@ export default function RoundHome() {
         {locked ? (
           <p className="muted" style={{ marginTop: 0 }}>
             {gameLabel} · {round.scoring === 'net' ? 'Net' : 'Gross'}
-            {round.game !== 'wolf' && ` · ${round.format === 'match' ? 'Match Play' : 'Stroke Play'}`}
+            {FORMAT_GAMES.includes(round.game) &&
+              ` · ${round.format === 'match' ? 'Match Play' : 'Stroke Play'}`}
           </p>
         ) : (
           <div className="segmented" style={{ marginBottom: 12 }}>
@@ -94,7 +99,7 @@ export default function RoundHome() {
               ))}
             </div>
 
-            {round.game !== 'wolf' && (
+            {FORMAT_GAMES.includes(round.game) && (
               <>
                 <label>Format</label>
                 <div className="segmented" style={{ marginBottom: 12 }}>

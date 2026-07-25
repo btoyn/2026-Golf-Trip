@@ -23,7 +23,7 @@ export interface Course {
 export type PairingSplit = 0 | 1 | 2
 
 /** The main game played in a round. */
-export type GameType = 'stableford' | 'vegas' | 'wolf'
+export type GameType = 'stableford' | 'vegas' | 'wolf' | 'teamstroke'
 
 /** Whether scores are handicap-adjusted (net) or raw (gross) for the round. */
 export type ScoringMode = 'net' | 'gross'

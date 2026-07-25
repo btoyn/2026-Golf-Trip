@@ -5,6 +5,7 @@ import { useStore } from '../lib/store'
 import { COURSES } from '../data/courses'
 import {
   computeAllSkins,
+  computeTeamStroke,
   computeVegas,
   computeWolf,
   playerRoundLines,
@@ -29,6 +30,12 @@ const GAME_NAME: Record<string, string> = {
   stableford: 'Modified Stableford',
   vegas: 'Vegas',
   wolf: 'Wolf',
+  teamstroke: 'Team Stroke',
+}
+
+function toPar(n: number) {
+  if (n === 0) return 'E'
+  return n > 0 ? `+${n}` : `${n}`
 }
 
 export default function RoundSummary() {
@@ -70,6 +77,7 @@ export default function RoundSummary() {
         {round.game === 'stableford' && <StablefordResult {...{ players, round, course, name }} />}
         {round.game === 'vegas' && <VegasResult {...{ players, round, course, name }} />}
         {round.game === 'wolf' && <WolfResult {...{ players, round, course, name }} />}
+        {round.game === 'teamstroke' && <TeamStrokeResult {...{ players, round, course, name }} />}
 
         {skins.any && (
           <>
@@ -270,6 +278,40 @@ function VegasResult({ players, round, course, name }: SectionProps) {
         </div>
       ))}
       {winner === null && <p className="muted center">Vegas tied.</p>}
+    </>
+  )
+}
+
+function TeamStrokeResult({ players, round, course, name }: SectionProps) {
+  const t = computeTeamStroke(players, round, course)
+  return (
+    <>
+      <h2 className="section">Team Stroke Result</h2>
+      {t.teams.map((line, i) => (
+        <div className={`team-box ${t.leader === i ? 'winner' : ''}`} key={i}>
+          <div className="names">
+            <span>
+              {name(line.playerIds[0])} + {name(line.playerIds[1])}
+            </span>
+            {t.leader === i && <span className="chip">Winner</span>}
+          </div>
+          <div className="stats">
+            <div>
+              <span className="muted">Strokes</span>
+              <b>{line.total}</b>
+            </div>
+            <div>
+              <span className="muted">To Par</span>
+              <b>{toPar(line.toPar)}</b>
+            </div>
+            <div>
+              <span className="muted">Thru</span>
+              <b>{line.thru}</b>
+            </div>
+          </div>
+        </div>
+      ))}
+      {t.leader === null && <p className="muted center">All even.</p>}
     </>
   )
 }
